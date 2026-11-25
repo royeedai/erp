@@ -5,17 +5,17 @@
     "listeners": 44
   },
   "sevenBills": {
-    "heapMB": 29.77,
+    "heapMB": 29.6,
     "nodes": 17829,
     "listeners": 9981
   },
   "eightBills": {
-    "heapMB": 33.07,
+    "heapMB": 33.06,
     "nodes": 20344,
     "listeners": 11394
   },
   "allClosed": {
-    "heapMB": 8.28,
+    "heapMB": 8.27,
     "nodes": 79,
     "listeners": 44
   },
@@ -32,12 +32,12 @@
       "listeners": 44
     },
     {
-      "heapMB": 9.42,
+      "heapMB": 9.43,
       "nodes": 79,
       "listeners": 44
     },
     {
-      "heapMB": 9.55,
+      "heapMB": 9.54,
       "nodes": 79,
       "listeners": 44
     }

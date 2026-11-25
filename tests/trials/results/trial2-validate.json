@@ -1,0 +1,83 @@
+{
+  "errors": [
+    {
+      "rowId": "r8",
+      "rowNo": 8,
+      "key": "applyAmount",
+      "label": "申请金额",
+      "message": "申请金额不能为空"
+    },
+    {
+      "rowId": "r8",
+      "rowNo": 8,
+      "key": "dueDate",
+      "label": "到期日",
+      "message": "到期日不能为空"
+    },
+    {
+      "rowId": "r120",
+      "rowNo": 120,
+      "key": "applyAmount",
+      "label": "申请金额",
+      "message": "申请金额不能为负"
+    },
+    {
+      "rowId": "r200",
+      "rowNo": 200,
+      "key": "itemName",
+      "label": "物料名称",
+      "message": "物料名称不能为空"
+    },
+    {
+      "rowId": "r200",
+      "rowNo": 200,
+      "key": "payMethod",
+      "label": "付款方式",
+      "message": "付款方式不能为空"
+    }
+  ],
+  "located": [
+    {
+      "want": "r8|申请金额",
+      "got": "r8|申请金额",
+      "focused": true
+    },
+    {
+      "want": "r8|到期日",
+      "got": "r8|到期日",
+      "focused": true
+    },
+    {
+      "want": "r120|申请金额",
+      "got": "r120|申请金额",
+      "focused": true
+    },
+    {
+      "want": "r200|物料名称",
+      "got": "r200|物料名称",
+      "focused": true
+    },
+    {
+      "want": "r200|付款方式",
+      "got": "r200|付款方式",
+      "focused": true
+    }
+  ],
+  "errorMarksVisible": 2,
+  "afterFix": [],
+  "validateMs": {
+    "cpu1x": {
+      "n": 20,
+      "p50": 28.4,
+      "p95": 32.8,
+      "max": 33
+    },
+    "cpu4x": {
+      "n": 20,
+      "p50": 131.2,
+      "p95": 159.3,
+      "max": 225.1
+    }
+  },
+  "pageErrors": []
+}

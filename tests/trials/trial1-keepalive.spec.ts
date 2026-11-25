@@ -1,6 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
 import { cdpOf, memory, saveResult, stat, throttle } from './helpers'
 
+// 状态验证默认不降速；要看慢机器表现时设 TRIAL_RATE=4
+const RATE = Number(process.env.TRIAL_RATE ?? 1)
+
 interface PageLog {
   mounted: number
   unmounted: number
@@ -112,7 +115,7 @@ test('A 切换：状态与耗时', async ({ page }) => {
     }
   }
 
-  await throttle(client, 4)
+  await throttle(client, RATE)
   const paints: number[] = []
   const stables: number[] = []
   const losses: string[] = []
@@ -166,7 +169,7 @@ test('A 切换：状态与耗时', async ({ page }) => {
     renamed.push((await page.locator(`[data-bill="${id}"] .vxe-body--row`).first().locator('td').nth(2).innerText()).trim())
   }
   const result = { expected, paint: stat(paints), stable: stat(stables), lossCount: losses.length, losses: losses.slice(0, 20), renamed }
-  saveResult('trial1-switch', result)
+  saveResult(`trial1-switch-${RATE}x`, result)
   console.log(JSON.stringify(result, null, 1))
 })
 

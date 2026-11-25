@@ -136,9 +136,25 @@ async function validate(): Promise<EditError[]> {
 
 /* ---------- 键盘 ---------- */
 
+/**
+ * 激活某一格。
+ * 不用 setEditCell 自带的滚动：它要等 vxe 的 setTimeout(30ms)，这期间焦点在页面上，
+ * 快打字或扫码枪的按键会丢失或落到别的格。这里只触发滚动的同步部分，等一次 nextTick 就激活，
+ * 全程在微任务里完成，下一个按键事件插不进来。
+ */
+async function activate(row: Row, key: string) {
+  const table = tableRef.value
+  if (!table) return
+  void table.scrollToRow(row, key)
+  await nextTick()
+  // isPos 在 4.24.4 的源码里有（edit/hook.js 的 setEditCell），类型声明漏写；升级 vxe 时要重跑连按测试
+  if (table.getCellElement(row, key)) await table.setEditCell(row, key, { isPos: false } as object)
+  else await table.setEditCell(row, key)
+}
+
 async function focusCell(rowId: string, key: string) {
   const row = props.rows.find((r) => r.id === rowId)
-  if (row) await tableRef.value?.setEditCell(row, key)
+  if (row) await activate(row, key)
 }
 
 /** 当前格之后（或之前）的下一个可编辑格，跨行 */
@@ -166,7 +182,7 @@ async function move(step: 1 | -1) {
   editor?.commit()
   const next = nextEditable(cell.row, cell.column.field, step)
   if (next) {
-    await tableRef.value?.setEditCell(next.row, next.key)
+    await activate(next.row, next.key)
   } else {
     await tableRef.value?.clearEdit()
     if (step > 0) emit('reach-end')
@@ -185,7 +201,7 @@ async function cancel() {
 function onKeydown(e: KeyboardEvent) {
   if (e.isComposing || e.altKey || e.ctrlKey || e.metaKey || !editor) return
   if (e.key === 'Enter' || e.key === 'Tab') {
-    if (e.key === 'Enter' && editor.isPopupOpen()) return
+    if (e.key === 'Enter' && editor.ownsEnter()) return
     e.preventDefault()
     e.stopPropagation()
     void move(e.shiftKey ? -1 : 1)

@@ -33,6 +33,9 @@ const editor: CellEditor = {
   isPopupOpen() {
     return !!root.value?.querySelector('[aria-expanded="true"]')
   },
+  ownsEnter() {
+    return props.column.kind === 'select' && editor.isPopupOpen()
+  },
 }
 
 onMounted(async () => {
@@ -60,7 +63,7 @@ onBeforeUnmount(() => {
       :max-integer="column.maxInteger ?? 20"
       :allow-negative="column.allowNegative ?? true"
     />
-    <el-select v-else-if="column.kind === 'select'" v-model="draft" filterable :empty-values="[null, undefined]">
+    <el-select v-else-if="column.kind === 'select'" v-model="draft" filterable default-first-option :empty-values="[null, undefined]">
       <el-option v-for="o in column.options" :key="o.value" :value="o.value" :label="o.label" />
     </el-select>
     <el-date-picker

@@ -51,8 +51,10 @@ export interface CellChange<Row extends EditRow = EditRow> {
 export interface CellEditor {
   commit(): void
   cancel(): void
-  /** 浮层（下拉、日期面板）是否展开，展开时方向键和回车交给它自己处理 */
+  /** 浮层是否展开，展开时 Esc 先关浮层 */
   isPopupOpen(): boolean
+  /** 展开的下拉正在用回车选项；日期框键入后也会展开面板，但回车仍应确认并前进 */
+  ownsEnter(): boolean
 }
 
 export interface EditTableContext {

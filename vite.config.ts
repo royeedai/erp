@@ -21,7 +21,9 @@ export default defineConfig(({ mode }) => ({
   server: { host: '127.0.0.1', port: 5173, strictPort: true },
   preview: { host: '127.0.0.1' },
   test: {
+    // 护栏用例要加载 ESLint 全套规则，机器忙时首个用例会超过默认的 5 秒
+    testTimeout: 30_000,
     environment: 'jsdom',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'tests/guard/**/*.test.ts'],
   },
 }))

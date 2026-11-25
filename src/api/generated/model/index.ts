@@ -25,6 +25,7 @@ export * from './me';
 export * from './orgNode';
 export * from './orgNodeLevel';
 export * from './projectRole';
+export * from './projectRoleCounts';
 export * from './projectRoleCreate';
 export * from './projectRolePage';
 export * from './projectRoleUpdate';

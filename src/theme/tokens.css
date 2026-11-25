@@ -54,6 +54,9 @@
   --vxe-ui-table-border-color: var(--app-divider);
   --vxe-ui-table-row-hover-background-color: var(--app-row-hover-bg);
   --vxe-ui-table-row-current-background-color: var(--el-color-primary-light-9);
+  --vxe-ui-table-row-hover-current-background-color: var(--el-color-primary-light-8);
+  --vxe-ui-table-row-checkbox-checked-background-color: var(--el-color-primary-light-9);
+  --vxe-ui-table-row-hover-checkbox-checked-background-color: var(--el-color-primary-light-8);
   --vxe-ui-table-row-line-height: 22px;
   --vxe-ui-table-row-height-default: var(--app-row-height);
   --vxe-ui-table-cell-negative-color: var(--el-color-danger);
@@ -75,6 +78,10 @@ body {
 }
 #app {
   height: 100%;
+}
+/* Element Plus 的按钮没写 font-family，浏览器会退回 Arial */
+.el-button {
+  font-family: inherit;
 }
 .app-num {
   font-variant-numeric: tabular-nums;

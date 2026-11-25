@@ -222,14 +222,23 @@ components:
         allowedActions:
           type: array
           items: { $ref: '#/components/schemas/AllowedAction' }
+    ProjectRoleCounts:
+      type: object
+      description: 当前组织和关键字下各状态的条数，不受 enabled 条件影响
+      required: [all, enabled, disabled]
+      properties:
+        all: { type: integer }
+        enabled: { type: integer }
+        disabled: { type: integer }
     ProjectRolePage:
       type: object
-      required: [list, total]
+      required: [list, total, counts]
       properties:
         list:
           type: array
           items: { $ref: '#/components/schemas/ProjectRole' }
         total: { type: integer }
+        counts: { $ref: '#/components/schemas/ProjectRoleCounts' }
     ProjectRoleCreate:
       type: object
       required: [orgId, code, name, isManager]

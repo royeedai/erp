@@ -3,6 +3,7 @@
 import { computed, onActivated, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { keepPreviousData } from '@tanstack/vue-query'
+import { DArrowLeft, DArrowRight, Plus } from '@element-plus/icons-vue'
 import { ApiError } from '@/api/http'
 import { useGetOrgTree } from '@/api/generated/org/org'
 import { deleteProjectRole, setProjectRoleStatus, useListProjectRoles } from '@/api/generated/project-role/project-role'
@@ -11,8 +12,9 @@ import { PERM } from '@/app/permissions'
 import { useSessionStore } from '@/app/session.store'
 import { useTab } from '@/app/tabs/tabHost'
 import ActionBar, { type ActionItem } from '@/shared/ui/ActionBar.vue'
-import ListTable, { type ListColumn } from '@/shared/ui/ListTable.vue'
-import QueryBar from '@/shared/ui/QueryBar.vue'
+import type { DataColumn } from '@/shared/ui/columns'
+import DataTable from '@/shared/ui/DataTable.vue'
+import QueryBar, { type QueryTab } from '@/shared/ui/QueryBar.vue'
 import StatusTag from '@/shared/ui/StatusTag.vue'
 import { alertError, confirm, toast } from '@/shared/ui/feedback'
 import RoleFormDialog from './RoleFormDialog.vue'
@@ -25,6 +27,7 @@ const tab = useTab()
 /* ---------- 组织树 ---------- */
 
 const orgs = useGetOrgTree()
+const treeOpen = ref(true)
 
 function findOrg(nodes: OrgNode[], id: string): OrgNode | undefined {
   for (const n of nodes) {
@@ -52,10 +55,7 @@ function readCriteria(): Criteria {
 }
 
 const criteria = reactive<Criteria>(readCriteria())
-const draft = reactive<{ keyword: string; enabled: boolean | undefined }>({
-  keyword: criteria.keyword ?? '',
-  enabled: criteria.enabled,
-})
+const keyword = ref(criteria.keyword ?? '')
 
 function apply(patch: Partial<Criteria>) {
   Object.assign(criteria, patch)
@@ -71,16 +71,20 @@ function apply(patch: Partial<Criteria>) {
 }
 
 function search() {
-  const keyword = draft.keyword.trim() || undefined
-  const unchanged = keyword === criteria.keyword && draft.enabled === criteria.enabled && criteria.page === 1
-  apply({ keyword, enabled: draft.enabled, page: 1 })
+  const value = keyword.value.trim() || undefined
+  const unchanged = value === criteria.keyword && criteria.page === 1
+  apply({ keyword: value, page: 1 })
   if (unchanged) void list.refetch()
 }
-function reset() {
-  draft.keyword = ''
-  draft.enabled = undefined
-  search()
+function clearFilter() {
+  keyword.value = ''
+  apply({ keyword: undefined, enabled: undefined, page: 1 })
 }
+
+const status = computed({
+  get: () => (criteria.enabled === undefined ? 'all' : criteria.enabled ? 'enabled' : 'disabled'),
+  set: (key: string) => apply({ enabled: key === 'all' ? undefined : key === 'enabled', page: 1 }),
+})
 
 /* ---------- 列表 ---------- */
 
@@ -93,6 +97,17 @@ const total = computed(() => list.data.value?.total ?? 0)
 const error = computed(() => (list.error.value instanceof ApiError ? list.error.value : null))
 const filtered = computed(() => criteria.keyword !== undefined || criteria.enabled !== undefined)
 const currentOrg = computed(() => findOrg(orgs.data.value ?? [], criteria.orgId))
+const canCreate = computed(() => session.has(PERM.projectRoleCreate))
+
+const tabs = computed<QueryTab[]>(() => {
+  // 查询失败时条数未知，不显示
+  const counts = error.value ? undefined : list.data.value?.counts
+  return [
+    { key: 'all', label: '全部', count: counts?.all },
+    { key: 'enabled', label: '启用', count: counts?.enabled },
+    { key: 'disabled', label: '已停用', count: counts?.disabled },
+  ]
+})
 
 // 切回本页签时刷新：别处可能改过
 let first = true
@@ -106,15 +121,14 @@ watch([rows, total], () => {
   if (rows.value.length === 0 && total.value > 0 && criteria.page > 1) apply({ page: Math.max(1, criteria.page - 1) })
 })
 
-const columns: ListColumn<ProjectRole>[] = [
-  { key: 'code', label: '岗位编码', width: 110 },
-  { key: 'name', label: '岗位名称', minWidth: 130 },
-  { key: 'orgName', label: '所属组织', width: 100 },
-  { key: 'isManager', label: '经理岗位', width: 78, align: 'center' },
-  { key: 'enabled', label: '状态', width: 78, align: 'center' },
-  { key: 'refCount', label: '引用数', width: 70, align: 'right' },
-  { key: 'updatedAt', label: '最后修改', width: 160 },
-  { key: 'actions', label: '操作', width: 150, fixed: 'right' },
+const columns: DataColumn<ProjectRole>[] = [
+  { key: 'code', label: '岗位编码', kind: 'code' },
+  { key: 'name', label: '岗位名称', kind: 'name' },
+  { key: 'enabled', label: '状态', kind: 'status' },
+  { key: 'isManager', label: '经理岗位', kind: 'enum', text: (r) => (r.isManager ? '是' : '否') },
+  { key: 'refCount', label: '引用项目', kind: 'count' },
+  { key: 'orgName', label: '所属组织', kind: 'org' },
+  { key: 'updatedAt', label: '最后修改', kind: 'time' },
 ]
 
 function actionItems(row: ProjectRole): ActionItem[] {
@@ -124,65 +138,82 @@ function actionItems(row: ProjectRole): ActionItem[] {
     { action: 'delete', label: '删除', danger: true },
   ]
 }
+const titleOf = (row: ProjectRole) => `${row.code} ${row.name}`
+const canDisable = (row: ProjectRole) => row.allowedActions.some((a) => a.action === 'disable' && a.allowed)
 
 /* ---------- 动作 ---------- */
 
 const dialogOpen = ref(false)
 const editing = ref<ProjectRole | null>(null)
 
-function openCreate() {
-  editing.value = null
+function openForm(row: ProjectRole | null) {
+  editing.value = row
   dialogOpen.value = true
 }
 
-async function run(action: string, row: ProjectRole) {
-  if (action === 'edit') {
-    editing.value = row
-    dialogOpen.value = true
-    return
-  }
-  try {
-    if (action === 'delete') {
-      const ok = await confirm({
-        title: '删除岗位',
-        message: `删除“${row.code} ${row.name}”？删除后不能恢复。`,
-        confirmText: '删除',
-        danger: true,
-      })
-      if (!ok) return
-      await deleteProjectRole(row.id, { version: row.version })
-      toast.success('已删除')
-    } else {
-      const enable = action === 'enable'
-      if (!enable) {
-        const ok = await confirm({
-          title: '停用岗位',
-          message: `停用“${row.code} ${row.name}”？停用后新单据选不到，历史单据仍显示原值。`,
-          confirmText: '停用',
-        })
-        if (!ok) return
-      }
-      await setProjectRoleStatus(row.id, { enabled: enable, version: row.version })
-      toast.success(enable ? '已启用' : '已停用')
-    }
-    await list.refetch()
-  } catch (e) {
-    if (!(e instanceof ApiError)) throw e
-    const detail = e.references.length > 0 ? `${e.message}：${e.references.join('、')}` : e.message
-    await alertError('操作未完成', detail)
-    // 数据可能已被他人改动，刷新拿最新的行和可办动作
-    await list.refetch()
-  }
+async function setEnabled(row: ProjectRole, enabled: boolean) {
+  await setProjectRoleStatus(row.id, { enabled, version: row.version })
+  toast.success(enabled ? '已启用' : '已停用')
+  return true
 }
 
-async function onSaved() {
+/** 不能删：给原因；能停用就给“改为停用”。返回是否做了改动 */
+async function explainBlocked(row: ProjectRole, reason: string): Promise<boolean> {
+  if (!canDisable(row)) {
+    await alertError(`不能删除 ${row.code}`, reason)
+    return false
+  }
+  const ok = await confirm({
+    title: `不能删除 ${row.code}`,
+    message: `${reason}。停用后新单据选不到，历史单据仍显示原值。`,
+    confirmText: '改为停用',
+  })
+  return ok && setEnabled(row, false)
+}
+
+async function act(row: ProjectRole, action: string): Promise<boolean> {
+  if (action === 'enable') return setEnabled(row, true)
+  if (action === 'disable') {
+    const ok = await confirm({
+      title: '停用岗位',
+      message: `停用“${titleOf(row)}”？停用后新单据选不到，历史单据仍显示原值。`,
+      confirmText: '停用',
+    })
+    return ok && setEnabled(row, false)
+  }
+  const ok = await confirm({
+    title: '删除岗位',
+    message: `删除“${titleOf(row)}”？删除后不能恢复。`,
+    confirmText: '删除',
+    danger: true,
+  })
+  if (!ok) return false
+  await deleteProjectRole(row.id, { version: row.version })
+  toast.success('已删除')
+  return true
+}
+
+/** 改动过或失败了就刷新：失败时数据可能已被他人改动，要拿最新的行和可办动作 */
+async function guarded(row: ProjectRole, job: () => Promise<boolean>) {
+  try {
+    if (!(await job())) return
+  } catch (e) {
+    if (!(e instanceof ApiError)) throw e
+    if (e.references.length > 0) await guarded(row, () => explainBlocked(row, `${e.message}：${e.references.join('、')}`))
+    else await alertError('操作未完成', e.message)
+  }
   await list.refetch()
+}
+
+function run(action: string, row: ProjectRole) {
+  if (action === 'edit') openForm(row)
+  else void guarded(row, () => act(row, action))
 }
 </script>
 
 <template>
   <div class="app-page role-page">
-    <div class="app-panel role-tree">
+    <div v-show="treeOpen" class="app-panel role-tree">
       <el-tree
         v-loading="orgs.isLoading.value"
         :data="orgs.data.value ?? []"
@@ -195,23 +226,29 @@ async function onSaved() {
         @node-click="(n: OrgNode) => apply({ orgId: n.id, page: 1 })"
       />
     </div>
+    <el-button
+      class="role-fold"
+      text
+      :icon="treeOpen ? DArrowLeft : DArrowRight"
+      :aria-label="treeOpen ? '收起组织树' : '展开组织树'"
+      @click="treeOpen = !treeOpen"
+    />
     <div class="app-panel role-main">
-      <QueryBar :loading="list.isFetching.value" @search="search" @reset="reset">
-        <el-form-item label="编码或名称">
-          <el-input v-model="draft.keyword" name="keyword" clearable style="width: 200px" />
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="draft.enabled" placeholder="全部" clearable style="width: 120px" :empty-values="[null, undefined]">
-            <el-option label="启用" :value="true" />
-            <el-option label="停用" :value="false" />
-          </el-select>
-        </el-form-item>
-        <template #extra>
-          <el-button v-if="session.has(PERM.projectRoleCreate)" type="primary" @click="openCreate">新增岗位</el-button>
+      <QueryBar
+        v-model:tab="status"
+        v-model:keyword="keyword"
+        :tabs="tabs"
+        placeholder="编码或名称"
+        @search="search"
+        @refresh="list.refetch()"
+      >
+        <template #primary>
+          <el-button v-if="canCreate" type="primary" :icon="Plus" @click="openForm(null)">新增岗位</el-button>
         </template>
       </QueryBar>
       <div class="role-table">
-        <ListTable
+        <DataTable
+          noun="岗位"
           :rows="rows"
           :columns="columns"
           :total="total"
@@ -223,15 +260,23 @@ async function onSaved() {
           @update:page="(page) => apply({ page })"
           @update:size="(size) => apply({ size, page: 1 })"
           @retry="list.refetch()"
+          @clear-filter="clearFilter"
         >
-          <template #cell-isManager="{ row }">{{ row.isManager ? '是' : '' }}</template>
           <template #cell-enabled="{ row }">
             <StatusTag :tone="row.enabled ? 'done' : 'draft'" :text="row.enabled ? '启用' : '已停用'" />
           </template>
-          <template #cell-actions="{ row }">
-            <ActionBar :actions="actionItems(row)" :allowed="row.allowedActions" @run="(a) => run(a, row)" />
+          <template #actions="{ row }">
+            <ActionBar
+              :actions="actionItems(row)"
+              :allowed="row.allowedActions"
+              @run="(action) => run(action, row)"
+              @blocked="(_action, reason) => guarded(row, () => explainBlocked(row, reason))"
+            />
           </template>
-        </ListTable>
+          <template #empty-action>
+            <el-button v-if="canCreate" @click="openForm(null)">新增岗位</el-button>
+          </template>
+        </DataTable>
       </div>
     </div>
     <RoleFormDialog
@@ -239,7 +284,7 @@ async function onSaved() {
       :target="editing"
       :org-id="criteria.orgId"
       :org-name="currentOrg?.name ?? ''"
-      @saved="onSaved"
+      @saved="list.refetch()"
       @dirty-change="tab.setDirty"
     />
   </div>
@@ -249,12 +294,17 @@ async function onSaved() {
 .role-page {
   height: 100%;
   display: flex;
-  gap: var(--app-space-3);
 }
 .role-tree {
   width: 180px;
   flex: none;
   overflow: auto;
+}
+.role-fold.el-button {
+  width: 16px;
+  flex: none;
+  align-self: center;
+  padding: 0;
 }
 .role-main {
   flex: 1;

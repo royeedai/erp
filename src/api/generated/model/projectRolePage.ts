@@ -9,8 +9,10 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProjectRole } from './projectRole';
+import type { ProjectRoleCounts } from './projectRoleCounts';
 
 export interface ProjectRolePage {
   list: ProjectRole[];
   total: number;
+  counts: ProjectRoleCounts;
 }

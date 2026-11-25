@@ -71,7 +71,7 @@ export type ParseResult = { ok: true; value: Amount } | { ok: false; reason: str
 export function toHalfWidth(text: string): string {
   return text
     .replace(/[！-～]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
-    .replace(/　/g, ' ')
+    .replace(/\u3000/g, ' ')
     .replace(/[−–﹣]/g, '-')
     .replace(/。/g, '.')
 }
@@ -82,7 +82,7 @@ export function toHalfWidth(text: string): string {
  */
 export function parseAmount(text: string, rule: AmountRule = {}): ParseResult {
   const { scale = 2, maxInteger = 20, allowNegative = true } = rule
-  let s = toHalfWidth(text).replace(/ /g, ' ').trim()
+  let s = toHalfWidth(text).replace(/\u00a0/g, ' ').trim()
   if (s === '') return { ok: true, value: null }
   if (/[\r\n\t]/.test(s)) return { ok: false, reason: '只能粘贴一个数，请不要带换行或多个单元格' }
 
@@ -120,9 +120,9 @@ export function parseAmount(text: string, rule: AmountRule = {}): ParseResult {
     s = s.replace(/,/g, '')
   }
   // 1 234 567.00：空格或窄空格作千分位
-  if (/[   ]/.test(s)) {
-    if (!/^\d{1,3}([   ]\d{3})+(\.\d*)?$/.test(s)) return { ok: false, reason: '只能粘贴一个数' }
-    s = s.replace(/[   ]/g, '')
+  if (/[ \u2009\u202f]/.test(s)) {
+    if (!/^\d{1,3}([ \u2009\u202f]\d{3})+(\.\d*)?$/.test(s)) return { ok: false, reason: '只能粘贴一个数' }
+    s = s.replace(/[ \u2009\u202f]/g, '')
   }
   if (!/^(\d+\.?\d*|\.\d+)$/.test(s)) return { ok: false, reason: '不是有效的数字' }
 

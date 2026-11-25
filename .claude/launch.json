@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "supplier-prototype",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["exec", "vite", "--config", "examples/supplier-prototype/vite.config.ts"],
+      "port": 5183,
+      "url": "http://127.0.0.1:5183"
+    }
+  ]
+}

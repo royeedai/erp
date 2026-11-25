@@ -7,6 +7,7 @@ let roles = seedRoles()
 const idempotent = new Map<string, RoleRecord>()
 let nextId = 1000
 let expired = false
+let failNextList = false
 
 const LATENCY = 120
 
@@ -120,19 +121,25 @@ export const handlers = [
     const user = userOf(request)
     if (!user) return unauthorized()
     if (!user.permissions.includes('project:role:view')) return forbidden('project:role:view')
+    if (failNextList) {
+      failNextList = false
+      return fail(500, { code: 'SERVER_ERROR', message: '服务器出错，请稍后重试' })
+    }
     const q = new URL(request.url).searchParams
     const orgId = q.get('orgId') ?? 'G'
     const keyword = (q.get('keyword') ?? '').trim()
     const enabled = q.get('enabled')
     const page = Number(q.get('page') ?? 1)
     const size = Number(q.get('size') ?? 50)
-    const matched = roles
+    const inScope = roles
       .filter((r) => r.orgId === orgId || r.orgId === 'G')
       .filter((r) => !keyword || r.name.includes(keyword) || r.code.includes(keyword))
-      .filter((r) => enabled === null || String(r.enabled) === enabled)
+    const matched = inScope.filter((r) => enabled === null || String(r.enabled) === enabled)
+    const on = inScope.filter((r) => r.enabled).length
     return HttpResponse.json({
       list: matched.slice((page - 1) * size, page * size).map((r) => toDto(r, user, orgId)),
       total: matched.length,
+      counts: { all: inScope.length, enabled: on, disabled: inScope.length - on },
     })
   }),
 
@@ -224,6 +231,10 @@ export const handlers = [
   // ---------- 仅供测试：模拟“别人”的动作和会话失效 ----------
   http.post('/api/__mock/expire', () => {
     expired = true
+    return new HttpResponse(null, { status: 204 })
+  }),
+  http.post('/api/__mock/fail-list', () => {
+    failNextList = true
     return new HttpResponse(null, { status: 204 })
   }),
   http.post('/api/__mock/roles/:id/touch', ({ params }) => {

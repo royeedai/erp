@@ -8,3 +8,13 @@ dist-mock
 .claude/settings.local.json
 test-results
 playwright-report
+
+# 竞品走查只入库笔记；截图、图册和证据含店铺名与演示环境，不入库
+独立报告/**/*.jpg
+独立报告/**/*.png
+独立报告/微盟设计走查/走查图册.html
+独立报告/微盟设计走查/走查证据.json
+# 参照站的应用目录和原始流程记录，只留在本机
+独立报告/YonBIP参照走查/全量走查/应用目录.json
+独立报告/YonBIP参照走查/全量走查/应用目录.md
+独立报告/YonBIP参照走查/全量走查/流程记录.json

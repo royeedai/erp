@@ -66,6 +66,8 @@
   --el-font-size-base: 12px;
   --el-font-size-small: 12px;
   --el-font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  /* 按钮、复选框默认 500，只用 400 和 700 */
+  --el-font-weight-primary: 400;
   --el-overlay-color-lighter: rgba(0, 0, 0, .3);
 
   --app-shadow-float: 0 4px 16px rgba(30, 30, 60, .18);

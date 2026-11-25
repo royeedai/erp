@@ -2,8 +2,7 @@
 // 项目岗位（A 级，表内编辑档案）：标题行选项目组织，左边项目基本分类，右表增行、修改、删除，整表一次保存。
 import { computed, nextTick, onActivated, ref, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { DArrowLeft, RefreshRight, UserFilled } from '@element-plus/icons-vue'
-import type { TreeInstance } from 'element-plus'
+import { RefreshRight, UserFilled } from '@element-plus/icons-vue'
 import { ApiError } from '@/api/http'
 import { useGetOrgTree } from '@/api/generated/org/org'
 import { deleteProjectRoles, saveProjectRoles, setProjectRoleStatus, useGetProjectCategoryTree, useListProjectRoles } from '@/api/generated/project-role/project-role'
@@ -16,9 +15,9 @@ import DetailBar from '@/shared/ui/DetailBar.vue'
 import EditTable from '@/shared/ui/edit-table/EditTable.vue'
 import type { EditColumn, EditError, EditRow } from '@/shared/ui/edit-table/types'
 import EmptyHint from '@/shared/ui/EmptyHint.vue'
-import FolderIcon from '@/shared/ui/FolderIcon.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import RefPicker from '@/shared/ui/RefPicker.vue'
+import TreeLayout from '@/shared/ui/TreeLayout.vue'
 import { alertError, confirm, toast } from '@/shared/ui/feedback'
 
 const route = useRoute()
@@ -67,15 +66,8 @@ watch([orgId, categoryId, showDisabled], () => {
 })
 const label = (n: { code: string | null; name: string | null }) => `${n.code ?? ''} ${n.name ?? ''}`.trim()
 
-const treeRef = useTemplateRef<TreeInstance>('treeRef')
-async function selectNode(n: ProjectCategory) {
-  if (n.id === categoryId.value) return
-  if (entry.editing.value && !(await entry.cancel())) {
-    treeRef.value?.setCurrentKey(categoryId.value)
-    return
-  }
-  categoryId.value = n.id
-}
+/** 正在编辑就先问要不要放弃；不放弃就留在原来的分类 */
+const leaveEdit = async () => !entry.editing.value || (await entry.cancel())
 
 /* ---------- 列表 ---------- */
 
@@ -264,7 +256,6 @@ const deleteSelected = () => guarded(() => removeRoles(selection.value.flatMap((
 
 /* ---------- 布局 ---------- */
 
-const treeOpen = ref(true)
 const listOpen = ref(true)
 const full = ref(false)
 </script>
@@ -275,7 +266,6 @@ const full = ref(false)
       <template #after>
         <RefPicker
           v-model="orgId"
-          class="role-org"
           :nodes="orgs.data.value ?? []"
           :loading="orgs.isLoading.value"
           title="项目组织"
@@ -286,143 +276,86 @@ const full = ref(false)
         <el-checkbox v-model="showDisabled" label="显示停用岗位" :disabled="editing" />
       </template>
     </PageHeader>
-    <div class="app-page-body">
-      <aside v-show="treeOpen && !full" v-loading="tree.isLoading.value" class="role-tree">
-        <el-tree
-          v-if="nodes.length > 0"
-          ref="treeRef"
-          class="app-tree"
-          :data="nodes"
-          node-key="id"
-          highlight-current
-          :default-expanded-keys="nodes.map((n) => n.id)"
-          :current-node-key="categoryId"
-          :expand-on-click-node="false"
-          :indent="26"
-          @node-click="(n: ProjectCategory) => selectNode(n)"
-        >
-          <template #default="{ data, node: n }">
-            <span class="app-tree-node"><FolderIcon v-if="!n.isLeaf" :open="n.expanded" />{{ label(data as ProjectCategory) }}</span>
-          </template>
-        </el-tree>
+    <TreeLayout
+      v-model="categoryId"
+      noun="分类"
+      :nodes="nodes"
+      :label="label"
+      :loading="orgs.isLoading.value || tree.isLoading.value"
+      :before-select="leaveEdit"
+      :full="full"
+    >
+      <template #empty>
+        <EmptyHint v-if="orgs.isError.value" title="组织没取到"><el-button @click="orgs.refetch()">重新查询</el-button></EmptyHint>
         <EmptyHint v-else-if="!orgId" title="先选项目组织" note="选了组织才有分类" />
         <EmptyHint v-else-if="tree.isError.value" title="分类没取到"><el-button @click="tree.refetch()">重新查询</el-button></EmptyHint>
-      </aside>
-      <div class="app-page-main">
-        <button v-if="!full" type="button" class="role-fold" :class="{ 'is-closed': !treeOpen }" :aria-label="treeOpen ? '收起分类树' : '展开分类树'" @click="treeOpen = !treeOpen">
-          <el-icon><DArrowLeft /></el-icon>
-        </button>
-        <DetailBar v-model:open="listOpen" v-model:full="full" title="岗位" :count="rows.length" :selected="selection.length" :reason="node && !node.canMaintain ? node.reason : undefined">
-          <template v-if="node?.canMaintain && editing">
-            <el-button-group>
-              <el-button :disabled="saving" @click="addRow">增行</el-button>
-              <el-button :disabled="saving || selection.length === 0" @click="removeSelected">删行</el-button>
-            </el-button-group>
-            <el-button-group>
-              <el-button type="primary" :loading="saving" @click="entry.save()">保存</el-button>
-              <el-button :disabled="saving" @click="cancelEdit">取消</el-button>
-            </el-button-group>
+      </template>
+      <DetailBar v-model:open="listOpen" v-model:full="full" title="岗位" :count="rows.length" :selected="selection.length" :reason="node && !node.canMaintain ? node.reason : undefined">
+        <template v-if="node?.canMaintain && editing">
+          <el-button-group>
+            <el-button :disabled="saving" @click="addRow">增行</el-button>
+            <el-button :disabled="saving || selection.length === 0" @click="removeSelected">删行</el-button>
+          </el-button-group>
+          <el-button-group>
+            <el-button type="primary" :loading="saving" @click="entry.save()">保存</el-button>
+            <el-button :disabled="saving" @click="cancelEdit">取消</el-button>
+          </el-button-group>
+        </template>
+        <template v-else>
+          <el-button-group v-if="node?.canMaintain">
+            <el-button type="primary" :disabled="!list.isSuccess.value" @click="addRow">增行</el-button>
+            <el-button :disabled="rows.length === 0" @click="editRow()">修改</el-button>
+            <el-button :disabled="selection.length === 0" @click="deleteSelected">删除</el-button>
+          </el-button-group>
+          <el-button class="app-icon-btn" :icon="RefreshRight" aria-label="刷新" title="刷新" @click="list.refetch()" />
+        </template>
+      </DetailBar>
+      <el-alert v-if="error && rows.length > 0" type="error" :closable="false" show-icon :title="error.message">
+        <el-button link @click="list.refetch()">重新查询</el-button>
+      </el-alert>
+      <div v-show="listOpen" class="app-page-fill">
+        <EditTable
+          ref="table"
+          v-model:selection="selection"
+          height="100%"
+          selectable
+          table-key="project-role"
+          :rows="rows"
+          :columns="columns"
+          :readonly="!editing"
+          :problems="errors"
+          :loading="orgs.isLoading.value || tree.isLoading.value || list.isFetching.value || saving"
+          @change="(c) => entry.onChange(c.row.id, c.key)"
+        >
+          <template #actions="{ row }">
+            <ActionBar
+              v-if="editing"
+              :actions="[{ action: 'remove', label: '删行' }]"
+              :allowed="[{ action: 'remove', allowed: canRemove(row), reason: allowedOf(row, 'delete').reason }]"
+              @run="entry.removeRows([row.id])"
+            />
+            <ActionBar
+              v-else
+              :actions="rowActions(row)"
+              :allowed="byId.get(row.id)?.allowedActions ?? []"
+              @run="(action) => run(action, row)"
+              @blocked="(_action, reason) => guarded(() => explainBlocked(byId.get(row.id)!, reason))"
+            />
           </template>
-          <template v-else>
-            <el-button-group v-if="node?.canMaintain">
-              <el-button type="primary" :disabled="!list.isSuccess.value" @click="addRow">增行</el-button>
-              <el-button :disabled="rows.length === 0" @click="editRow()">修改</el-button>
-              <el-button :disabled="selection.length === 0" @click="deleteSelected">删除</el-button>
-            </el-button-group>
-            <el-button class="app-icon-btn" :icon="RefreshRight" aria-label="刷新" title="刷新" @click="list.refetch()" />
+          <template #empty>
+            <EmptyHint v-if="error?.kind === 'forbidden'" title="没有权限查看" :note="error.permission ? `缺少权限：${error.permission}` : '请联系管理员开通'" />
+            <EmptyHint v-else-if="error" title="查询失败" :note="`${error.message}${error.traceId ? `，追踪号 ${error.traceId}` : ''}`">
+              <el-button @click="list.refetch()">重新查询</el-button>
+            </EmptyHint>
+            <EmptyHint v-else-if="!orgId && !orgs.isLoading.value" title="还没有查询" note="先选项目组织" />
+            <template v-else-if="!list.isFetching.value && node">
+              <EmptyHint v-if="!node.canMaintain" title="这里没有岗位" :note="node.reason" />
+              <EmptyHint v-else :title="`${label(node)}下还没有岗位`" :note="inherited ? `现在用的是上级分类 ${inherited.categoryName} 的 ${inherited.count} 个岗位` : '点增行开始录入'" />
+            </template>
           </template>
-        </DetailBar>
-        <el-alert v-if="error && rows.length > 0" type="error" :closable="false" show-icon :title="error.message">
-          <el-button link @click="list.refetch()">重新查询</el-button>
-        </el-alert>
-        <div v-show="listOpen" class="app-page-fill">
-          <EditTable
-            ref="table"
-            v-model:selection="selection"
-            height="100%"
-            selectable
-            table-key="project-role"
-            :rows="rows"
-            :columns="columns"
-            :readonly="!editing"
-            :problems="errors"
-            :loading="list.isFetching.value || saving"
-            @change="(c) => entry.onChange(c.row.id, c.key)"
-          >
-            <template #actions="{ row }">
-              <ActionBar
-                v-if="editing"
-                :actions="[{ action: 'remove', label: '删行' }]"
-                :allowed="[{ action: 'remove', allowed: canRemove(row), reason: allowedOf(row, 'delete').reason }]"
-                @run="entry.removeRows([row.id])"
-              />
-              <ActionBar
-                v-else
-                :actions="rowActions(row)"
-                :allowed="byId.get(row.id)?.allowedActions ?? []"
-                @run="(action) => run(action, row)"
-                @blocked="(_action, reason) => guarded(() => explainBlocked(byId.get(row.id)!, reason))"
-              />
-            </template>
-            <template #empty>
-              <EmptyHint v-if="error?.kind === 'forbidden'" title="没有权限查看" :note="error.permission ? `缺少权限：${error.permission}` : '请联系管理员开通'" />
-              <EmptyHint v-else-if="error" title="查询失败" :note="`${error.message}${error.traceId ? `，追踪号 ${error.traceId}` : ''}`">
-                <el-button @click="list.refetch()">重新查询</el-button>
-              </EmptyHint>
-              <EmptyHint v-else-if="!orgId" title="还没有查询" note="先选项目组织" />
-              <template v-else-if="!list.isFetching.value && node">
-                <EmptyHint v-if="!node.canMaintain" title="这里没有岗位" :note="node.reason" />
-                <EmptyHint v-else :title="`${label(node)}下还没有岗位`" :note="inherited ? `现在用的是上级分类 ${inherited.categoryName} 的 ${inherited.count} 个岗位` : '点增行开始录入'" />
-              </template>
-            </template>
-          </EditTable>
-        </div>
+        </EditTable>
       </div>
-    </div>
+    </TreeLayout>
     <ConflictDialog v-model="conflictOpen" :message="conflictMessage" :groups="conflictGroups" @use-latest="entry.conflict.useLatest" @keep-mine="entry.conflict.keepMine" />
   </div>
 </template>
-
-<style>
-.role-org.el-input {
-  width: 190px;
-  margin-right: var(--app-space-6);
-}
-.role-tree {
-  flex: none;
-  width: 22%;
-  min-width: 240px;
-  max-width: 509px;
-  overflow: auto;
-  border-right: 1px solid var(--app-panel-border);
-  background: var(--app-bg-tree);
-}
-.role-tree > .app-empty {
-  padding-top: 80px;
-}
-.role-fold {
-  position: absolute;
-  z-index: 8;
-  left: -12px;
-  top: 18px;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: var(--app-bg-container);
-  box-shadow: var(--app-shadow-float);
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  cursor: pointer;
-}
-.role-fold:focus-visible {
-  outline: 2px solid var(--app-focus);
-}
-.role-fold.is-closed {
-  left: -8px;
-}
-.role-fold.is-closed .el-icon {
-  transform: rotate(180deg);
-}
-</style>

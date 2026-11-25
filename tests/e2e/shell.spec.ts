@@ -134,7 +134,7 @@ test('会话失效：回到登录页并带上原地址', async ({ page }) => {
   await login(page, 'admin', ROLES)
   await expect(rowOf(page, 'GC01')).toBeVisible()
   await call(page, '/api/__mock/expire')
-  await page.locator('.role-tree .app-tree-node', { hasText: 'TZ 投资类' }).click()
+  await page.locator('.app-tree-side .app-tree-node', { hasText: 'TZ 投资类' }).click()
   await expect(page).toHaveURL(/\/login\?redirect=/)
 })
 

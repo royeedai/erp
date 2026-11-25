@@ -3,6 +3,7 @@ import vue from 'eslint-plugin-vue'
 import { defineConfig, globalIgnores } from 'eslint/config'
 import tseslint from 'typescript-eslint'
 import { guard } from './lint/guard.js'
+import { pageStructure } from './lint/page-structure.js'
 
 export default defineConfig([
   globalIgnores([
@@ -60,6 +61,18 @@ export default defineConfig([
   { files: ['src/theme/**/*.ts'], rules: guard({ color: true }) },
   { files: ['src/shared/ui/**/*.{ts,vue}'], rules: guard({ vxe: true }) },
   { files: ['src/shared/ui/feedback.ts'], rules: guard({ feedback: true }) },
+  // 样例页是给人和 AI 照抄的，和业务页面守一样的页面规则
+  { files: ['src/samples/**/*.{ts,vue}'], rules: guard({ page: true }) },
+  {
+    files: ['src/features/**/*.vue', 'src/samples/**/*.vue'],
+    plugins: { page: pageStructure },
+    rules: { 'page/one-primary': 'error', 'page/row-actions': 'error' },
+  },
+  {
+    files: ['src/features/**/*Page.vue'],
+    plugins: { page: pageStructure },
+    rules: { 'page/header': 'error' },
+  },
   {
     files: ['src/features/**/*.{ts,vue}'],
     rules: {

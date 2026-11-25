@@ -44,6 +44,7 @@ lint/、tests/guard/        护栏清单与回归
 | `DataTable` `ColumnSettings` `EmptyHint` | 有：勾选、序号、按类型排宽、操作列、合计行、列设置（含行高）、底部、五种空态 |
 | `EditTable` | 有：单据明细和表内编辑共用；勾选、操作列、列设置、开关列、错误摘要 |
 | `DetailBar` | 有：明细条，名称和行数、已选、动作、收起、全屏 |
+| `TreeLayout` | 有：左树右表，树可收起，加载中不露空态，换节点前可先问 |
 | `RefPicker` | 有树形单选：搜索、显示停用、候选范围；多选、列表型、包含下级还没有 |
 | `useSubmit` `useEntryForm` `useEntryTable` | 有，在 `src/shared/entry/`：未保存、字段错误、幂等、冲突、连点，整页卡片、对话框、表内编辑共用 |
 | `FormDialog` `ConflictDialog` | 有；对话框只管布局，逻辑在 `useEntryForm` |
@@ -88,7 +89,27 @@ lint/、tests/guard/        护栏清单与回归
 | 第二套 UI 库、没登记的组件 | Element Plus 和封装 | 无 |
 
 - 以上对整个 `src/` 生效。业务目录再加两条：引入用白名单，注释关不掉规则。
-- 清单只在 `lint/guard.js` 和 `stylelint.config.js`。业务目录要用新包，先问用户，再改白名单。
+- 清单只在 `lint/guard.js`、`lint/page-structure.js` 和 `stylelint.config.js`。业务目录要用新包、新组件，或专页要放行，先问用户，再改白名单。
 - 误报就改清单，并在 `tests/guard/` 加一个样例；现有代码违规就改代码，不放宽规则。
 - 页面用例覆盖：正常、空、403、字段错、版本冲突、重复点击、批量部分失败；金额覆盖零、负数、不同精度、含税尾差。
 - `examples/`（样页原型）和 `element-theme/`（对比页）不在检查范围。
+
+### 页面规则
+
+业务目录和样例页另守下表。页面只填字段、列、动作和接口，外观由公共封装给；缺什么先补封装。
+
+| 拦下 | 改用 |
+|---|---|
+| 没登记的 `el-*`，原生的标题、表格、按钮、输入框 | 公共封装；登记的在 `lint/guard.js` 的 `PAGE_COMPONENTS` |
+| `<style>`、`.css`、`style`、不是 `app-` 开头的 class、`v-html` | 公共封装 |
+| `*Page.vue` 没有标题行 | `PageHeader` 或 `BillPage`，最外层是 `app-page` |
+| 两个实心主按钮、彩色按钮、逐个设大小和形状 | 一个主按钮，其余普通按钮 |
+| “暂存”“确定”“确认” | 保存、保存新增、保存提交，或具体动作 |
+| 表格单元格里的裸按钮 | `ActionBar` |
+| 按状态判断能不能做、写死的权限码 | `allowedActions`、`PERM` |
+| “暂无数据”、`el-empty`、`el-result` | `EmptyHint` |
+| `Number()`、`parseFloat`、`toFixed`、一元 `+` | `src/shared/money/amount.ts`；页码用 `Number.parseInt(x, 10)` |
+| `toLocaleString` 一类、`Intl` | 日期按接口给的字符串显示 |
+
+- `tests/e2e/page-standard.spec.ts` 把全部应用里的页面逐个打开量：标题行、主按钮、行高、按钮高、字号字重、横向溢出、占位文字。新页面登记了路由就自动进来。
+- 拦不住：普通下拉冒充参照；在脚本里按状态算好再传给按钮；编辑中、对话框打开后的样子（巡检只看刚打开的页面）。

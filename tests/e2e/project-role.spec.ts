@@ -5,7 +5,7 @@ import { actionOf, box, call, dialog, login, moreOf, overlayGone, rowOf, seen, t
 watchConsole()
 
 const PATH = '/project/roles'
-const category = (page: Page, text: string) => page.locator('.role-tree .app-tree-node', { hasText: text })
+const category = (page: Page, text: string) => page.locator('.app-tree-side .app-tree-node', { hasText: text })
 const btn = (page: Page, name: string) => page.locator('.app-detail-bar').getByRole('button', { name, exact: true })
 const name = (page: Page) => page.locator('.app-detail-name')
 const problems = (page: Page) => page.locator('.app-edit-problems')
@@ -28,7 +28,7 @@ const saves = (page: Page) => {
 
 test('组织和分类：默认带出组织，根节点不能维护，父分类能维护，地址记住', async ({ page }) => {
   await login(page, 'admin', PATH)
-  await expect(page.locator('.role-org input')).toHaveValue('01 示例集团')
+  await expect(page.locator('.app-page-header .el-input input')).toHaveValue('01 示例集团')
   await expect(category(page, '项目基本分类')).toBeVisible()
   await expect(seen(page, '这里没有岗位')).toHaveCount(1)
   await expect(page.locator('.app-detail-reason')).toHaveText('这一层不能维护岗位，请选下面的分类')
@@ -40,7 +40,7 @@ test('组织和分类：默认带出组织，根节点不能维护，父分类�
   await expect(btn(page, '增行')).toBeEnabled()
   await expect(btn(page, '删除')).toBeDisabled()
   // 父分类自己有岗位，下级没定义就写明用的是谁的
-  await page.locator('.role-tree .el-tree-node', { hasText: 'GC 工程类' }).last().locator('.el-tree-node__expand-icon').first().click()
+  await page.locator('.app-tree-side .el-tree-node', { hasText: 'GC 工程类' }).last().locator('.el-tree-node__expand-icon').first().click()
   await category(page, 'GC-002 市政工程').click()
   await expect(seen(page, '现在用的是上级分类 GC 工程类 的 6 个岗位')).toHaveCount(1)
   await category(page, 'GC-001 房建工程').click()
@@ -54,7 +54,7 @@ test('组织和分类：默认带出组织，根节点不能维护，父分类�
   await expect(name(page)).toHaveText('岗位 (7)')
   // 收起树、收起表
   await page.getByRole('button', { name: '收起分类树' }).click()
-  await expect(page.locator('.role-tree')).toBeHidden()
+  await expect(page.locator('.app-tree-side')).toBeHidden()
   await page.getByRole('button', { name: '展开分类树' }).click()
   await page.getByRole('button', { name: '收起岗位' }).click()
   await expect(page.locator('.app-edit-table')).toBeHidden()
@@ -69,7 +69,7 @@ test('换项目组织：只列有权的，停用的默认不列', async ({ page 
   await d.getByRole('button', { name: '确定' }).click()
   await expect(page).toHaveURL(/org=O2/)
   await expect(seen(page, 'GC 工程类下还没有岗位')).toHaveCount(1)
-  await expect(page.locator('.role-org input')).toHaveValue('0102 华南项目部')
+  await expect(page.locator('.app-page-header .el-input input')).toHaveValue('0102 华南项目部')
 })
 
 test('增行：加在末尾、焦点进第一格、默认值填好、回车到下一格；没填过取消不问', async ({ page }) => {
@@ -86,7 +86,7 @@ test('增行：加在末尾、焦点进第一格、默认值填好、回车到�
   await expect(btn(page, '保存')).toHaveClass(/el-button--primary/)
   await expect(btn(page, '取消')).toBeVisible()
   await expect(btn(page, '修改')).toHaveCount(0)
-  await expect(page.locator('.role-org input')).toBeDisabled()
+  await expect(page.locator('.app-page-header .el-input input')).toBeDisabled()
   await page.keyboard.type('GC20')
   await page.keyboard.press('Enter')
   await expect(editor(page)).toHaveAttribute('aria-label', '岗位名称')
@@ -349,7 +349,7 @@ test('未保存时切分类：先问，不放弃就留在原分类', async ({ pa
   await expect(box(page)).toContainText('有未保存的改动')
   await box(page).getByRole('button', { name: '继续编辑' }).click()
   await expect(page).toHaveURL(/category=GC/)
-  await expect(page.locator('.role-tree .is-current > .el-tree-node__content')).toContainText('GC 工程类')
+  await expect(page.locator('.app-tree-side .is-current > .el-tree-node__content')).toContainText('GC 工程类')
   await expect(rowOf(page, 'GC25')).toBeVisible()
   await overlayGone(page)
   await category(page, 'TZ 投资类').click()

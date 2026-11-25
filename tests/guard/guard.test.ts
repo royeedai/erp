@@ -291,6 +291,137 @@ describe('第二套 UI 库', () => {
   templateCases(/vue\/no-undef-components/, ['<a-button />', '<n-button />', '<v-btn />'])
 })
 
+describe('页面风格：结构', () => {
+  templateCases(/不写原生结构标签/, [
+    '<h2>供应商</h2>',
+    '<table><tbody><tr><td>1</td></tr></tbody></table>',
+    '<button>新增</button>',
+    '<input>',
+    '<aside />',
+  ])
+  templateCases(/不单独写 el-form/, [
+    '<el-form inline><el-form-item label="名称"><el-input /></el-form-item></el-form>',
+    '<ElForm />',
+    '<DataTable><el-form /></DataTable>',
+  ])
+  templateCases(/分页由 DataTable 带/, ['<el-pagination :total="1" />', '<ElPagination />'])
+  templateCases(/不直接写 el-dialog/, [
+    '<el-dialog><el-input /></el-dialog>',
+    '<ElDialog />',
+    '<elDialog />',
+    '<component is="el-dialog" />',
+    '<component :is="\'ElDialog\'" />',
+  ])
+  scriptCases(/不直接写 el-dialog/, ["import { ElDialog } from 'element-plus'", "const c = resolveComponent('ElDialog')"])
+  templateCases(/不用 el-drawer/, ['<el-drawer><el-input /></el-drawer>'])
+  templateCases(/不用 el-tabs/, ['<el-tabs><el-tab-pane label="全部" /></el-tabs>'])
+  templateCases(/不放常驻侧栏/, ['<el-aside><el-menu /></el-aside>', '<ElMenuItem />'])
+  templateCases(/不用 el-card/, ['<el-card>1</el-card>'])
+  templateCases(/页面不自己排/, ['<el-row><el-col :span="12" /></el-row>', '<el-space />'])
+  templateCases(/不直接写 el-tree/, ['<el-tree :data="[]" />'])
+  templateCases(/参照用 RefPicker/, [
+    '<el-cascader />',
+    '<el-tree-select />',
+    '<el-autocomplete />',
+    '<el-select remote />',
+    '<el-select :remote-method="f" />',
+  ])
+  templateCases(/先补公共封装，不直接写 el-upload/, ['<el-upload />'])
+  // 没登记的组件一律拦下，不用逐个列
+  templateCases(/只能用登记过的 Element Plus 组件/, ['<el-steps />', '<ElCalendar />', '<el-carousel />', '<el-some-new-thing />'])
+  scriptCases(/只能用登记过的 Element Plus 组件/, ["import { ElSteps } from 'element-plus'"])
+
+  it.each([
+    ['没有标题行', '<div class="app-page"><DataTable /></div>', /页面要有标题行/],
+    ['最外层不是 app-page', '<div><PageHeader title="供应商" /></div>', /页面最外层是/],
+  ])('%s', async (_name, code, expected) => {
+    expect((await lint(template(code), FEATURE + 'SamplePage.vue')).join('\n')).toMatch(expected)
+  })
+})
+
+describe('页面风格：交互', () => {
+  templateCases(/一页只有一个实心主按钮/, [
+    '<div><el-button type="primary">新增</el-button><el-button type="primary">导出</el-button></div>',
+    '<div><el-button type="primary">新增</el-button><p><ElButton type="primary">导出</ElButton></p></div>',
+    '<div><el-button :type="ok ? \'primary\' : undefined">新增</el-button><el-button type="primary">导出</el-button></div>',
+    '<div><el-button type="primary">新增</el-button><el-button v-if="a" type="primary">甲</el-button><el-button v-else>乙</el-button></div>',
+    '<div><el-button type="primary">新增</el-button><el-dropdown split-button type="primary">导出</el-dropdown></div>',
+  ])
+  templateCases(/按钮只有主按钮和普通按钮/, [
+    '<el-button type="success">提交</el-button>',
+    '<el-button type="warning">作废</el-button>',
+    '<el-button type="danger">删除</el-button>',
+    '<el-button :type="ok ? \'success\' : \'primary\'">提交</el-button>',
+  ])
+  templateCases(/不逐个设/, ['<el-button round>新增</el-button>', '<el-button plain>新增</el-button>', '<el-input size="large" />', '<el-select :size="s" />'])
+  templateCases(/不叫“暂存”/, ['<el-button>暂存</el-button>', '<el-button>{{ \'暂存\' }}</el-button>', '<el-tooltip content="暂存" />'])
+  scriptCases(/不叫“暂存”/, ["const actions = [{ action: 'draft', label: '暂存' }]"])
+  templateCases(/按钮写具体动作/, ['<el-button>确定</el-button>', '<FormDialog save-text="确认" />'])
+  scriptCases(/按钮写具体动作/, ["void confirm({ title: 'a', message: 'b', confirmText: '确定' })"])
+  templateCases(/不用 el-popconfirm/, ['<el-popconfirm title="删除？"><template #reference><el-button>删除</el-button></template></el-popconfirm>'])
+  templateCases(/不按状态推断/, [
+    '<el-button v-if="row.status === \'draft\'">删除</el-button>',
+    '<el-button v-show="row.billStatus !== 1">删除</el-button>',
+    '<el-button :disabled="row.status !== \'draft\'">删除</el-button>',
+    '<ActionBar v-if="row.approveState === 2 && ok" />',
+    '<el-dropdown-item v-if="row.status == \'draft\'">删除</el-dropdown-item>',
+  ])
+  templateCases(/权限码只在/, ['<el-button v-if="perms.includes(\'project:role:edit\')">修改</el-button>'])
+  scriptCases(/权限码只在/, ["const canEdit = has('project:role:edit')"])
+  templateCases(/操作列用 ActionBar/, [
+    '<DataTable><template #actions="{ row }"><el-button link @click="f(row)">修改</el-button><el-button link>提交</el-button><el-button link>复制</el-button><el-button link>删除</el-button></template></DataTable>',
+    '<EditTable><template v-slot:actions><div><el-button link>修改</el-button></div></template></EditTable>',
+    '<DataTable><template #cell-op="{ row }"><el-button link @click="f(row)">修改</el-button></template></DataTable>',
+  ])
+  templateCases(/不写“暂无数据”/, ['<p>暂无数据</p>', '<EmptyHint title="暂无数据" />', '<p>{{ \'暂无数据\' }}</p>'])
+  templateCases(/不用 el-empty/, ['<el-empty />', '<el-result />'])
+})
+
+describe('页面风格：视觉', () => {
+  styleCases(/业务页面不写样式/, [
+    'font-size: 15px;',
+    'padding: 13px;',
+    'border-radius: 10px;',
+    'height: 40px !important;',
+    'font-weight: 600;',
+    'font-family: serif;',
+    'margin: var(--app-space-2);',
+  ])
+  it.each([
+    ['深度选择器', '.a :deep(.el-button) { height: 40px; }'],
+    ['引入别的样式', "@import './x.css';"],
+  ])('样式 %s', async (_name, css) => {
+    const expected = /业务页面不写样式/
+    expect((await lintStyle(`<template><div /></template>\n\n<style>\n${css}\n</style>\n`, FEATURE + 'Sample.vue')).join('\n')).toMatch(expected)
+    expect((await lintStyle(`<template><div /></template>\n\n<style scoped>\n${css}\n</style>\n`, FEATURE + 'Sample.vue')).join('\n')).toMatch(expected)
+    expect((await lintStyle(`${css}\n`, 'src/samples/sample.css')).join('\n')).toMatch(expected)
+  })
+  it('样式换语言也不行', async () => {
+    expect((await lint('<template><div /></template>\n\n<style lang="scss">\n.a { b: c }\n</style>\n', FEATURE + 'Sample.vue')).join('\n')).toMatch(/vue\/block-lang/)
+  })
+  templateCases(/业务页面不写样式/, ['<p style="margin-top: 7px; width: 333px">1</p>', '<p :style="{ width: \'200px\' }">1</p>', '<p :style="s">1</p>'])
+  templateCases(/class 只用 app- 开头/, ['<div class="flex gap-4 p-2" />', '<div class="app-page my-page" />', '<div class="red" />'])
+  templateCases(/状态用 StatusTag/, ['<el-tag type="success">已通过</el-tag>', '<ElTag />', '<el-badge />'])
+  templateCases(/vue\/no-v-html/, ['<div v-html="x" />'])
+})
+
+describe('页面风格：数据', () => {
+  scriptCases(/金额、数量是字符串/, [
+    "const n = Number('12.30') + 0.1",
+    'const n = parseFloat(row.amount)',
+    'const n = Number.parseFloat(row.amount)',
+    'const n = +row.amount',
+    'const s = (1.005).toFixed(2)',
+  ])
+  templateCases(/金额、数量是字符串/, ['<span>{{ (1.005).toFixed(2) }}</span>', '<span>{{ Number(a) + Number(b) }}</span>'])
+  scriptCases(/日期按接口给的字符串显示/, [
+    'const s = new Date().toLocaleString()',
+    "const s = new Date().toLocaleDateString('zh-CN')",
+    "const f = new Intl.NumberFormat('zh-CN')",
+  ])
+  templateCases(/日期按接口给的字符串显示/, ['<span>{{ new Date().toLocaleString() }}</span>'])
+})
+
 describe('注释关不掉', () => {
   it('脚本和模板', async () => {
     const code = [
@@ -332,34 +463,86 @@ describe('放行的位置', () => {
       "import { useRoute } from 'vue-router'",
       "import { storeToRefs } from 'pinia'",
       "import { keepPreviousData } from '@tanstack/vue-query'",
-      "import type { FormInstance } from 'element-plus'",
-      "import { Search } from '@element-plus/icons-vue'",
+      "import type { FormRules } from 'element-plus'",
+      "import { Goods, RefreshRight } from '@element-plus/icons-vue'",
       "import { ApiError, newIdempotencyKey } from '@/api/http'",
       "import { useListProjectRoles } from '@/api/generated/project-role/project-role'",
+      "import { PERM } from '@/app/permissions'",
+      "import { formatAmount, sumAmounts } from '@/shared/money/amount'",
+      "import ActionBar from '@/shared/ui/ActionBar.vue'",
       "import AmountInput from '@/shared/ui/AmountInput.vue'",
       "import DataTable from '@/shared/ui/DataTable.vue'",
-      "import { toast } from '@/shared/ui/feedback'",
+      "import FormDialog from '@/shared/ui/FormDialog.vue'",
+      "import PageHeader from '@/shared/ui/PageHeader.vue'",
+      "import QueryBar from '@/shared/ui/QueryBar.vue'",
+      "import StatusTabs from '@/shared/ui/StatusTabs.vue'",
+      "import StatusTag from '@/shared/ui/StatusTag.vue'",
+      "import { confirm, toast } from '@/shared/ui/feedback'",
       "import Child from './Child.vue'",
       "defineOptions({ name: 'SamplePage', inheritAttrs: false })",
-      "const form = ref<FormInstance>()",
+      "const emit = defineEmits<{ 'update:page': [page: number] }>()",
+      "const rules: FormRules = { name: [{ required: true, message: '请填写名称' }] }",
       "const amount = ref<string | null>('0.00')",
+      "const total = computed(() => formatAmount(sumAmounts(['1.00', '2.00'], 2), 2))",
       "const orderNo = computed(() => '#' + newIdempotencyKey())",
-      "const color = 'var(--el-color-primary)'",
-      "const used = [useRoute, storeToRefs, keepPreviousData, Search, ApiError, useListProjectRoles, toast, form, orderNo]",
+      "const page = Number.parseInt('2', 10)",
+      "const remove = () => confirm({ title: '删除', message: '删除后不能恢复', confirmText: '删除', danger: true })",
+      "const used = [useRoute, storeToRefs, keepPreviousData, ApiError, useListProjectRoles, toast, orderNo, PERM, page, emit]",
+      "const editing = ref(false)",
+      "const row = { status: 'draft' }",
       '</script>',
       '',
       '<template>',
-      '  <div class="red" :style="{ color, width: \'200px\' }" :title="String(used.length)">',
-      '    <el-form ref="form"><el-form-item label="金额"><AmountInput v-model="amount" /></el-form-item></el-form>',
-      '    <el-tag type="success" effect="light">已完成</el-tag>',
+      '  <div class="app-page" :title="String(used.length)">',
+      '    <PageHeader title="供应商" :icon="Goods">',
+      '      <template #after><el-checkbox label="显示停用" /></template>',
+      '      <el-button-group v-if="editing">',
+      '        <el-button type="primary">保存</el-button>',
+      '        <el-button>取消</el-button>',
+      '      </el-button-group>',
+      '      <el-button v-else type="primary">新增<el-icon class="el-icon--right"><Goods /></el-icon></el-button>',
+      '      <el-button class="app-icon-btn" :icon="RefreshRight" aria-label="刷新" @click="remove" />',
+      '    </PageHeader>',
+      '    <QueryBar>',
+      '      <el-input placeholder="名称" clearable />',
+      '      <el-select filterable><el-option value="1" label="甲" /></el-select>',
+      '      <el-date-picker class="app-dates is-wide is-required" type="daterange" />',
+      '      <template #advanced><el-form label-width="80px"><el-form-item label="名称"><el-input /></el-form-item></el-form></template>',
+      '    </QueryBar>',
+      '    <div class="app-page-body">',
+      '      <div class="app-page-main">',
+      '        <StatusTabs model-value="all" :tabs="[{ key: \'all\', label: \'全部\' }]" />',
+      '        <div class="app-page-fill">',
+      '          <DataTable noun="供应商" :rows="[]" :columns="[]" :total="0" :page="1" :size="50" :summary="{ label: \'本页合计\', values: { amount: total } }">',
+      '            <template #cell-name="{ row: r }"><a class="app-link">{{ r }}</a></template>',
+      '            <template #cell-status><StatusTag tone="draft" text="草稿" /></template>',
+      '            <template #actions><ActionBar :actions="[]" :allowed="[]" /></template>',
+      '            <template #empty-action><el-button>新增</el-button></template>',
+      '          </DataTable>',
+      '        </div>',
+      '      </div>',
+      '    </div>',
+      '    <el-alert v-if="row.status === \'draft\'" type="error" title="查询失败"><el-button link>重新查询</el-button></el-alert>',
+      '    <FormDialog :model-value="false" title="供应商" :rules="rules" :initial="() => ({})" :submit="async () => 1" saved-text="已保存">',
+      '      <el-form-item label="金额"><AmountInput v-model="amount" /></el-form-item>',
+      '      <el-form-item label="启用"><el-switch /></el-form-item>',
+      '    </FormDialog>',
       '    <Transition name="fade"><Child v-loading="false" /></Transition>',
-      '    <DataTable noun="岗位" :rows="[]" :columns="[]" :total="0" :page="1" :size="50" />',
       '    <RouterLink to="/home">返回</RouterLink>',
       '  </div>',
       '</template>',
       '',
+    ].join('\n')
+    expect(await lint(code, FEATURE + 'SamplePage.vue')).toEqual([])
+    expect(await lintStyle(code, FEATURE + 'SamplePage.vue')).toEqual([])
+  })
+
+  it('封装自己的样式不误伤', async () => {
+    const code = [
+      '<template><div class="app-x" /></template>',
+      '',
       '<style>',
-      '.red {',
+      '.app-x {',
       '  color: var(--el-color-primary);',
       '  border: 1px solid transparent;',
       '  background: currentColor;',
@@ -369,8 +552,8 @@ describe('放行的位置', () => {
       '</style>',
       '',
     ].join('\n')
-    expect(await lint(code, FEATURE + 'Sample.vue')).toEqual([])
-    expect(await lintStyle(code, FEATURE + 'Sample.vue')).toEqual([])
+    expect(await lint(code, 'src/shared/ui/SampleBox.vue')).toEqual([])
+    expect(await lintStyle(code, 'src/shared/ui/SampleBox.vue')).toEqual([])
   })
 
   it('业务测试文件可以用 vitest', async () => {

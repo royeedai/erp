@@ -159,6 +159,11 @@ button {
   display: flex;
   flex-direction: column;
 }
+/* 标题行里的组织 */
+.app-page-header > .el-input {
+  width: 190px;
+  margin-right: var(--app-space-6);
+}
 .app-page-body {
   flex: 1;
   min-height: 0;

@@ -180,7 +180,7 @@ test('查询失败和无权：各带下一步，不显示条数，清掉看不�
   await supplier.fill('无权')
   await supplier.press('Enter')
   await expect(seen(page, '没有权限查看')).toHaveCount(1)
-  await expect(seen(page, '缺少权限：sample:order:view')).toHaveCount(1)
+  await expect(seen(page, '缺少权限：project:role:view')).toHaveCount(1)
   await expect(mainRows(page)).toHaveCount(0)
 })
 

@@ -1,7 +1,9 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from '@playwright/test'
 
-// 端到端：mock 构建 + 本机 Chrome
+// 端到端：mock 构建 + 本机 Chrome。几个 worktree 同时跑时用 E2E_PORT 错开端口
+const PORT = process.env.E2E_PORT ?? '4173'
+
 export default defineConfig({
   testDir: '.',
   timeout: 60_000,
@@ -15,13 +17,13 @@ export default defineConfig({
     headless: true,
     actionTimeout: 8_000,
     viewport: { width: 1366, height: 768 },
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: `http://127.0.0.1:${PORT}`,
     screenshot: 'only-on-failure',
   },
   webServer: {
-    command: 'pnpm exec vite build --mode mock && pnpm exec vite preview --mode mock --port 4173 --strictPort',
+    command: `pnpm exec vite build --mode mock && pnpm exec vite preview --mode mock --port ${PORT} --strictPort`,
     cwd: fileURLToPath(new URL('../..', import.meta.url)),
-    url: 'http://127.0.0.1:4173/',
+    url: `http://127.0.0.1:${PORT}/`,
     reuseExistingServer: false,
     timeout: 120_000,
   },

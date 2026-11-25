@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import type { FormRules } from 'element-plus'
 import { ArrowDown, Goods, RefreshRight } from '@element-plus/icons-vue'
 import { ApiError } from '@/api/http'
+import { PERM } from '@/app/permissions'
 import { usePreferencesStore } from '@/app/preferences.store'
 import { useTab } from '@/app/tabs/tabHost'
 import { formatAmount, sumAmounts } from '@/shared/money/amount'
@@ -60,7 +61,7 @@ async function run() {
   loading.value = false
   // 样例专用：供应商填“出错”“无权”看这两种空态
   if (form.supplier === '出错') error.value = new ApiError('server', 500, { traceId: 'sample-1' })
-  if (form.supplier === '无权') error.value = new ApiError('forbidden', 403, { permission: 'sample:order:view' })
+  if (form.supplier === '无权') error.value = new ApiError('forbidden', 403, { permission: PERM.projectRoleView })
   asked.value = { ...form }
   page.value = 1
   void router.replace({ query: { org: form.orgId, ...(form.no ? { no: form.no } : {}) } })
@@ -153,6 +154,10 @@ const allowed = (r: OrderRow) => [
   { action: 'delete', allowed: r.status === 'draft', reason: '只有草稿能删' },
 ]
 const todo = (what: string) => toast.warning(`样例没有做：${what}`)
+function create(source: string) {
+  if (source === '自制') formOpen.value = true
+  else todo(source)
+}
 
 /* ---------- 录入对话框样例 ---------- */
 
@@ -184,11 +189,11 @@ const conflict = {
 <template>
   <div class="app-page">
     <PageHeader title="列表样例" :icon="Goods" tone="violet">
-      <el-dropdown trigger="click" @command="(c?: string) => c && todo(c)">
+      <el-dropdown trigger="click" @command="create">
         <el-button type="primary">新增<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item @click="formOpen = true">自制</el-dropdown-item>
+            <el-dropdown-item command="自制">自制</el-dropdown-item>
             <el-dropdown-item command="请购单">请购单</el-dropdown-item>
             <el-dropdown-item command="采购合同">采购合同</el-dropdown-item>
           </el-dropdown-menu>

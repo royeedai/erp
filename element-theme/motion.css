@@ -1,0 +1,147 @@
+/*
+ * 动效调校层：只覆盖 Element Plus 2.14.8 已有的过渡类名，不改组件、不新增组件。
+ * 启用：<html class="app-motion">，并配合 motion.js 的 dialogTransition。
+ * --app-motion-scale：1 为正常；远程桌面或用户关闭动画时设为 0.01。
+ */
+:root {
+  --app-motion-scale: 1;
+  --app-dur-fast: calc(.12s * var(--app-motion-scale));
+  --app-dur-mid: calc(.2s * var(--app-motion-scale));
+  --app-dur-slow: calc(.3s * var(--app-motion-scale));
+  --app-ease-enter: cubic-bezier(.08, .82, .17, 1);
+  --app-ease-leave: cubic-bezier(.78, .14, .15, .86);
+  --app-ease-slide: cubic-bezier(.23, 1, .32, 1);
+  --app-zoom-from: .2;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --app-motion-scale: .01; }
+}
+
+@keyframes app-mask-in { from { background-color: transparent; } }
+@keyframes app-mask-out { to { background-color: transparent; } }
+@keyframes app-zoom-in { from { opacity: 0; transform: scale(var(--app-zoom-from)); } }
+@keyframes app-zoom-out { to { opacity: 0; transform: scale(var(--app-zoom-from)); } }
+
+/* ---------- 对话框：从点击位置展开，遮罩单独淡入 ---------- */
+.app-motion .app-dialog-enter-active { animation: app-mask-in var(--app-dur-slow) linear; }
+.app-motion .app-dialog-leave-active { animation: app-mask-out var(--app-dur-mid) linear both; }
+.app-motion .el-modal-dialog .el-overlay-dialog { transform-origin: var(--app-origin, 50% 35%); }
+.app-motion .app-dialog-enter-active .el-overlay-dialog {
+  animation: app-zoom-in var(--app-dur-slow) var(--app-ease-enter);
+}
+.app-motion .app-dialog-leave-active .el-overlay-dialog {
+  animation: app-zoom-out var(--app-dur-mid) var(--app-ease-leave) both;
+}
+.app-motion .el-dialog {
+  --el-dialog-border-radius: 8px;
+  --el-dialog-box-shadow: var(--app-shadow-float);
+  --el-dialog-padding-primary: 20px;
+}
+.app-motion .el-dialog__title { font-size: 16px; font-weight: 600; line-height: 24px; }
+
+/* ---------- 确认框：同一套语言 ---------- */
+.app-motion .is-message-box.fade-in-linear-enter-from,
+.app-motion .is-message-box.fade-in-linear-leave-to { opacity: 1; }
+.app-motion .is-message-box.fade-in-linear-enter-active {
+  transition: none;
+  animation: app-mask-in var(--app-dur-slow) linear;
+}
+.app-motion .is-message-box.fade-in-linear-leave-active {
+  transition: none;
+  animation: app-mask-out var(--app-dur-mid) linear both;
+}
+.app-motion .is-message-box .el-overlay-message-box { transform-origin: var(--app-msgbox-origin, 50% 40%); }
+.app-motion .is-message-box.fade-in-linear-enter-active .el-overlay-message-box {
+  animation: app-zoom-in var(--app-dur-slow) var(--app-ease-enter);
+}
+.app-motion .is-message-box.fade-in-linear-leave-active .el-overlay-message-box {
+  animation: app-zoom-out var(--app-dur-mid) var(--app-ease-leave) both;
+}
+.app-motion .el-message-box {
+  --el-messagebox-border-radius: 8px;
+  --el-messagebox-box-shadow: var(--app-shadow-float);
+  --el-messagebox-padding-primary: 20px;
+  --el-messagebox-font-size: 16px;
+}
+
+/* ---------- 抽屉：去掉 transition: all，只动位移 ---------- */
+.app-motion .el-drawer-fade-enter-active { transition: background-color var(--app-dur-slow) linear; }
+.app-motion .el-drawer-fade-leave-active { transition: background-color var(--app-dur-mid) linear; }
+.app-motion .el-drawer { transition: none; box-shadow: var(--app-shadow-float); }
+.app-motion .el-drawer-fade-enter-active .el-drawer {
+  transition: transform var(--app-dur-slow) var(--app-ease-slide), opacity var(--app-dur-slow) linear;
+}
+.app-motion .el-drawer-fade-leave-active .el-drawer {
+  transition: transform var(--app-dur-mid) var(--app-ease-leave), opacity var(--app-dur-mid) linear;
+}
+.app-motion .el-drawer-fade-enter-from .el-drawer,
+.app-motion .el-drawer-fade-leave-to .el-drawer { opacity: .7; }
+.app-motion .el-drawer__header {
+  margin-bottom: 0;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.app-motion .el-drawer__title { font-weight: 600; line-height: 24px; }
+
+/* ---------- 全局提示：白底浮层 + 短位移，不再整条滑下来 ---------- */
+.app-motion .el-message {
+  border: none;
+  border-radius: 8px;
+  padding: 9px 14px;
+  background-color: var(--el-bg-color-overlay);
+  box-shadow: var(--app-shadow-float);
+  transition:
+    opacity var(--app-dur-mid) linear,
+    transform var(--app-dur-slow) var(--app-ease-slide),
+    top var(--app-dur-slow) var(--app-ease-slide),
+    bottom var(--app-dur-slow) var(--app-ease-slide);
+}
+.app-motion .el-message .el-message__content { color: var(--el-text-color-primary); line-height: 22px; }
+.app-motion .el-message .el-message__icon { font-size: 16px; }
+.app-motion .el-message-fade-enter-from.is-center { transform: translate(-50%, -20px) scale(.96); }
+.app-motion .el-message-fade-leave-to.is-center { transform: translate(-50%, -12px) scale(.96); }
+.app-motion .el-message-fade-leave-active {
+  transition: opacity var(--app-dur-fast) linear, transform var(--app-dur-mid) var(--app-ease-leave);
+}
+
+/* ---------- 通知 ---------- */
+.app-motion .el-notification {
+  --el-notification-shadow: var(--app-shadow-float);
+  transition:
+    opacity var(--app-dur-mid) linear,
+    transform var(--app-dur-slow) var(--app-ease-slide),
+    left var(--app-dur-slow) var(--app-ease-slide),
+    right var(--app-dur-slow) var(--app-ease-slide),
+    top var(--app-dur-slow) var(--app-ease-slide),
+    bottom var(--app-dur-slow) var(--app-ease-slide);
+}
+
+/* ---------- 下拉：从 0.8 展开，不再从 0 拉伸 ---------- */
+.app-motion .el-zoom-in-top-enter-active {
+  transition: transform var(--app-dur-mid) var(--app-ease-slide), opacity var(--app-dur-mid) linear;
+}
+.app-motion .el-zoom-in-top-leave-active {
+  transition: transform var(--app-dur-fast) var(--app-ease-leave), opacity var(--app-dur-fast) linear;
+}
+.app-motion .el-zoom-in-top-enter-from,
+.app-motion .el-zoom-in-top-leave-active { opacity: 0; transform: scaleY(.8); }
+
+/* ---------- 按钮点击反馈 ---------- */
+.app-motion .el-button:not(.is-text):not(.is-link):not(.is-disabled) { position: relative; }
+.app-motion .el-button:not(.is-text):not(.is-link):not(.is-disabled)::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: 0 0 0 5px var(--el-button-hover-border-color, var(--el-color-primary));
+  transition:
+    opacity calc(.4s * var(--app-motion-scale)) ease-out,
+    box-shadow calc(.3s * var(--app-motion-scale)) ease-out;
+}
+.app-motion .el-button:not(.is-text):not(.is-link):not(.is-disabled):active::after {
+  opacity: .4;
+  box-shadow: 0 0 0 0 var(--el-button-hover-border-color, var(--el-color-primary));
+  transition: none;
+}

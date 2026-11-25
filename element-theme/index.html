@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Element Plus 动效对比</title>
+<link rel="stylesheet" href="https://registry.npmmirror.com/element-plus/2.14.8/files/dist/index.css">
+<link rel="stylesheet" href="./theme.css">
+<link rel="stylesheet" href="./motion.css">
+<style>
+  body { margin: 0; background: var(--el-bg-color-page); color: var(--el-text-color-primary); font: 14px/22px var(--el-font-family); }
+  [v-cloak] { display: none; }
+  .bar { min-height: 48px; padding: 8px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; background: #fff; border-bottom: 1px solid var(--el-border-color-light); }
+  .bar b { font-size: 16px; }
+  .bar .sp { flex: 1; }
+  main { max-width: 1120px; margin: 16px auto; padding: 0 16px; }
+  .panel { background: #fff; border: 1px solid var(--el-border-color-light); border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+  .panel h2 { margin: 0 0 12px; font-size: 16px; line-height: 24px; font-weight: 600; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .row .el-button + .el-button { margin-left: 0; }
+  .num { font-variant-numeric: tabular-nums; }
+  .el-table { --el-table-header-bg-color: #F0F3F7; --el-table-header-text-color: #475467; --el-table-border-color: #D5DCE5; }
+  .tip { color: var(--el-text-color-secondary); margin: 12px 0 0; }
+  /* 仅演示用：让默认提示也跟随慢放 */
+  :root:not(.app-motion) .el-message { transition-duration: calc(.3s * var(--app-motion-scale)), calc(.4s * var(--app-motion-scale)), calc(.4s * var(--app-motion-scale)), calc(.4s * var(--app-motion-scale)); }
+</style>
+</head>
+<body>
+<div id="app" v-cloak>
+  <el-config-provider :locale="locale" :dialog="tuned ? { transition: dialogTransition } : {}">
+    <div class="bar">
+      <b>Element Plus 动效对比</b><span class="sp"></span>
+      <el-radio-group v-model="tuned">
+        <el-radio-button :value="false">Element 默认</el-radio-button>
+        <el-radio-button :value="true">调校后</el-radio-button>
+      </el-radio-group>
+      <el-radio-group v-model="scale">
+        <el-radio-button :value="1">正常速度</el-radio-button>
+        <el-radio-button :value="4">慢放 4 倍</el-radio-button>
+      </el-radio-group>
+    </div>
+    <main>
+      <section class="panel">
+        <h2>全局提示与通知</h2>
+        <div class="row">
+          <el-button id="msgOk" @click="msg('success', '保存成功')">成功</el-button>
+          <el-button @click="msg('warning', '本次付款超出资金计划 10,000.00，请填写理由')">预警</el-button>
+          <el-button @click="msg('error', '第 8 行：申请金额大于未付金额')">错误</el-button>
+          <el-button id="burst" @click="burst">连续 3 条</el-button>
+          <el-button @click="notify">右侧通知</el-button>
+          <el-select id="sel" v-model="sel" placeholder="下拉展开" style="width: 160px">
+            <el-option v-for="o in orgs" :key="o" :label="o" :value="o"></el-option>
+          </el-select>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>付款申请</h2>
+        <el-table :data="rows" border>
+          <el-table-column prop="no" label="单号" width="180"></el-table-column>
+          <el-table-column prop="vendor" label="供应商"></el-table-column>
+          <el-table-column label="申请金额（CNY）" align="right" width="170">
+            <template #default="{ row }"><span class="num">{{ row.amt }}</span></template>
+          </el-table-column>
+          <el-table-column label="操作" width="200">
+            <template #default="{ row }">
+              <el-button class="edit" link type="primary" @click="cur = row; dlg = true">编辑</el-button>
+              <el-button class="view" link type="primary" @click="cur = row; drw = true">详情</el-button>
+              <el-button class="void" link type="danger" @click="del(row)">作废</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <p class="tip">点不同行的“编辑”，看对话框从哪里展开。</p>
+      </section>
+      <div class="row">
+        <el-button id="openDlg" type="primary" @click="cur = rows[0]; dlg = true">打开对话框</el-button>
+        <el-button id="openDrw" @click="cur = rows[0]; drw = true">打开抽屉</el-button>
+        <el-button id="openBox" @click="del(rows[0])">打开确认框</el-button>
+      </div>
+    </main>
+    <el-dialog v-model="dlg" title="编辑付款申请" width="560px" draggable>
+      <el-form label-width="96px">
+        <el-form-item label="单号">{{ cur.no }}</el-form-item>
+        <el-form-item label="供应商"><el-input v-model="cur.vendor"></el-input></el-form-item>
+        <el-form-item label="申请金额"><el-input v-model="cur.amt"></el-input></el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dlg = false">取消</el-button>
+        <el-button type="primary" @click="dlg = false; msg('success', '保存成功')">保存</el-button>
+      </template>
+    </el-dialog>
+    <el-drawer v-model="drw" title="付款申请详情" size="520px">
+      <el-descriptions :column="1" border>
+        <el-descriptions-item label="单号">{{ cur.no }}</el-descriptions-item>
+        <el-descriptions-item label="供应商">{{ cur.vendor }}</el-descriptions-item>
+        <el-descriptions-item label="申请金额"><span class="num">{{ cur.amt }}</span></el-descriptions-item>
+      </el-descriptions>
+    </el-drawer>
+  </el-config-provider>
+</div>
+<script src="https://registry.npmmirror.com/vue/3.5.46/files/dist/vue.global.prod.js"></script>
+<script src="https://registry.npmmirror.com/element-plus/2.14.8/files/dist/index.full.min.js"></script>
+<script src="https://registry.npmmirror.com/element-plus/2.14.8/files/dist/locale/zh-cn.min.js"></script>
+<script type="module">
+import { installMotion, dialogTransition, markMessageBoxOrigin } from './motion.js'
+installMotion()
+const { createApp, ref, watch } = Vue
+const { ElMessage, ElMessageBox, ElNotification } = ElementPlus
+createApp({
+  setup() {
+    const tuned = ref(true), scale = ref(1), dlg = ref(false), drw = ref(false), sel = ref('')
+    const rows = ref([
+      { no: 'FKSQ202611240001', vendor: '示例供应商甲', amt: '128,000.00' },
+      { no: 'FKSQ202611240002', vendor: '示例供应商乙', amt: '1,560,320.50' },
+      { no: 'FKSQ202611240003', vendor: '示例供应商丙', amt: '9,800.00' },
+    ])
+    const cur = ref(rows.value[0])
+    const root = document.documentElement
+    watch([tuned, scale], () => {
+      root.classList.toggle('app-motion', tuned.value)
+      root.style.setProperty('--app-motion-scale', scale.value)
+      root.style.setProperty('--el-transition-duration', `${0.3 * scale.value}s`)
+      root.style.setProperty('--el-transition-duration-fast', `${0.2 * scale.value}s`)
+    }, { immediate: true })
+    const msg = (type, message) => ElMessage({ type, message })
+    const burst = () => ['第 1 条已提交', '第 2 条已提交', '第 3 条已提交'].forEach((m, i) => setTimeout(() => msg('success', m), i * 250))
+    const notify = () => ElNotification({ title: '导入完成', message: '成功 196 行，失败 4 行', type: 'warning' })
+    const del = (row) => {
+      if (tuned.value) markMessageBoxOrigin()
+      ElMessageBox.confirm(`作废 ${row.no}？此操作不可撤销。`, '作废付款申请', { type: 'warning', confirmButtonText: '作废', cancelButtonText: '取消', confirmButtonType: 'danger' }).catch(() => {})
+    }
+    return { locale: ElementPlusLocaleZhCn, dialogTransition, tuned, scale, dlg, drw, sel, rows, cur, msg, burst, notify, del, orgs: ['集团总部', '华东公司', '华南公司', '华北公司'] }
+  },
+}).use(ElementPlus).mount('#app')
+</script>
+</body>
+</html>

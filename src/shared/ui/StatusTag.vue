@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 状态：只有五种语义，颜色来自 token，业务不传颜色。
-// 常态（草稿·关闭、完成）用圆点，要引起注意的（处理中、关注、失败）用底色标签。
+// 常态（草稿·关闭、处理中、完成）只显示文字，要引起注意的（关注、失败）带底色。
 defineProps<{ tone: 'draft' | 'doing' | 'done' | 'watch' | 'fail'; text: string }>()
 </script>
 
@@ -9,43 +9,12 @@ defineProps<{ tone: 'draft' | 'doing' | 'done' | 'watch' | 'fail'; text: string 
 </template>
 
 <style>
-.app-status-tag {
+.app-status-tag.is-watch,
+.app-status-tag.is-fail {
   display: inline-block;
-  padding: 0 var(--app-space-2);
+  padding: 0 6px;
   border-radius: var(--app-radius-control);
-  font-size: var(--app-font-sm);
-  line-height: 20px;
-}
-.app-status-tag.is-draft,
-.app-status-tag.is-done {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0;
-  font-size: inherit;
-  line-height: 22px;
-  vertical-align: top;
-}
-.app-status-tag.is-draft::before,
-.app-status-tag.is-done::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-.app-status-tag.is-draft {
-  color: var(--el-text-color-secondary);
-}
-.app-status-tag.is-done {
-  color: var(--el-text-color-regular);
-}
-.app-status-tag.is-done::before {
-  background: var(--app-status-done-fg);
-}
-.app-status-tag.is-doing {
-  color: var(--app-status-doing-fg);
-  background: var(--app-status-doing-bg);
+  line-height: 18px;
 }
 .app-status-tag.is-watch {
   color: var(--app-status-watch-fg);

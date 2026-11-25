@@ -33,14 +33,16 @@ import type {
 } from 'vue';
 
 import type {
-  CreateProjectRoleHeaders,
-  DeleteProjectRoleParams,
   ErrorResponse,
+  GetProjectCategoryTreeParams,
   ListProjectRolesParams,
+  ProjectCategory,
   ProjectRole,
-  ProjectRoleCreate,
-  ProjectRolePage,
-  ProjectRoleUpdate,
+  ProjectRoleDelete,
+  ProjectRoleList,
+  ProjectRoleSave,
+  RowResult,
+  SaveProjectRolesHeaders,
   StatusBody
 } from '../model';
 
@@ -72,6 +74,84 @@ const getHeaders = (...sources: (RequestInit['headers'] | Record<string, string 
 };
 
 
+export const getGetProjectCategoryTreeUrl = (params: GetProjectCategoryTreeParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/project-categories/tree?${stringifiedParams}` : `/project-categories/tree`
+}
+
+export const getProjectCategoryTree = async (params: GetProjectCategoryTreeParams, options?: Parameters<typeof request>[1]): Promise<ProjectCategory[]> => {
+
+  return request<ProjectCategory[]>(getGetProjectCategoryTreeUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectCategoryTreeQueryKey = (params?: MaybeRefOrGetter<GetProjectCategoryTreeParams>,) => {
+    return [
+    'project-categories','tree', ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetProjectCategoryTreeQueryOptions = <TData = Awaited<ReturnType<typeof getProjectCategoryTree>>, TError = ErrorType<ErrorResponse>>(params: MaybeRefOrGetter<GetProjectCategoryTreeParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProjectCategoryTree>>, TError, TData>>, request?: SecondParameter<typeof request>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  getGetProjectCategoryTreeQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectCategoryTree>>> = ({ signal }) => getProjectCategoryTree(toValue(params), { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectCategoryTree>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetProjectCategoryTreeQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectCategoryTree>>>
+export type GetProjectCategoryTreeQueryError = ErrorType<ErrorResponse>
+
+
+export function useGetProjectCategoryTree<TData = Awaited<ReturnType<typeof getProjectCategoryTree>>, TError = ErrorType<ErrorResponse>>(
+ params: MaybeRefOrGetter<GetProjectCategoryTreeParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProjectCategoryTree>>, TError, TData>>, request?: SecondParameter<typeof request>}
+ , queryClient?: QueryClient
+ ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetProjectCategoryTreeQueryOptions(params,options)
+
+  const query = useQuery(queryOptions as UseQueryOptions<Awaited<ReturnType<typeof getProjectCategoryTree>>, TError, TData>, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
+
+  return query;
+}
+
+
+
+
+
+
 export const getListProjectRolesUrl = (params: ListProjectRolesParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -87,9 +167,9 @@ export const getListProjectRolesUrl = (params: ListProjectRolesParams,) => {
   return stringifiedParams.length > 0 ? `/project-roles?${stringifiedParams}` : `/project-roles`
 }
 
-export const listProjectRoles = async (params: ListProjectRolesParams, options?: Parameters<typeof request>[1]): Promise<ProjectRolePage> => {
+export const listProjectRoles = async (params: ListProjectRolesParams, options?: Parameters<typeof request>[1]): Promise<ProjectRoleList> => {
 
-  return request<ProjectRolePage>(getListProjectRolesUrl(params),
+  return request<ProjectRoleList>(getListProjectRolesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -150,23 +230,28 @@ export function useListProjectRoles<TData = Awaited<ReturnType<typeof listProjec
 
 
 
-export const getCreateProjectRoleUrl = () => {
+export const getSaveProjectRolesUrl = () => {
 
 
 
 
-  return `/project-roles`
+  return `/project-roles/batch-save`
 }
 
-export const createProjectRole = async (projectRoleCreate: ProjectRoleCreate,
-    headers: CreateProjectRoleHeaders, options?: Parameters<typeof request>[1]): Promise<ProjectRole> => {
+/**
+ * 整表一次保存，全部成功或全部不成功。
+ * 422 的 fieldErrors 带 rowId：现有行是 id，新增行是 tempId。
+ * 409 的 latest 是 { rows: ProjectRole[], removed: string[] }：被别人改过的行和被别人删掉的行。
+ */
+export const saveProjectRoles = async (projectRoleSave: ProjectRoleSave,
+    headers: SaveProjectRolesHeaders, options?: Parameters<typeof request>[1]): Promise<ProjectRoleList> => {
 
-  return request<ProjectRole>(getCreateProjectRoleUrl(),
+  return request<ProjectRoleList>(getSaveProjectRolesUrl(),
   {
     ...options,
     method: 'POST',
     headers: getHeaders({ 'Content-Type': 'application/json' }, headers, options?.headers),
-    body: JSON.stringify(projectRoleCreate)
+    body: JSON.stringify(projectRoleSave)
   }
 );}
 
@@ -174,13 +259,13 @@ export const createProjectRole = async (projectRoleCreate: ProjectRoleCreate,
 
 
 
-export const getCreateProjectRoleMutationKey = () => ['createProjectRole'] as const;
+export const getSaveProjectRolesMutationKey = () => ['saveProjectRoles'] as const;
 
-export const getCreateProjectRoleMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectRole>>, TError,CreateProjectRoleMutationVariables, TContext>, request?: SecondParameter<typeof request>}
-): UseMutationOptions<Awaited<ReturnType<typeof createProjectRole>>, TError,CreateProjectRoleMutationVariables, TContext> => {
+export const getSaveProjectRolesMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveProjectRoles>>, TError,SaveProjectRolesMutationVariables, TContext>, request?: SecondParameter<typeof request>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveProjectRoles>>, TError,SaveProjectRolesMutationVariables, TContext> => {
 
-const mutationKey = getCreateProjectRoleMutationKey();
+const mutationKey = getSaveProjectRolesMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -190,10 +275,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createProjectRole>>, CreateProjectRoleMutationVariables> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveProjectRoles>>, SaveProjectRolesMutationVariables> = (props) => {
           const {data,headers} = props ?? {};
 
-          return  createProjectRole(data,headers,requestOptions)
+          return  saveProjectRoles(data,headers,requestOptions)
         }
 
 
@@ -203,38 +288,45 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type CreateProjectRoleMutationResult = NonNullable<Awaited<ReturnType<typeof createProjectRole>>>
-    export type CreateProjectRoleMutationBody = ProjectRoleCreate
-    export type CreateProjectRoleMutationError = ErrorType<ErrorResponse>
-    export type CreateProjectRoleMutationVariables = {data: ProjectRoleCreate;headers: CreateProjectRoleHeaders}
+    export type SaveProjectRolesMutationResult = NonNullable<Awaited<ReturnType<typeof saveProjectRoles>>>
+    export type SaveProjectRolesMutationBody = ProjectRoleSave
+    export type SaveProjectRolesMutationError = ErrorType<ErrorResponse>
+    export type SaveProjectRolesMutationVariables = {data: ProjectRoleSave;headers: SaveProjectRolesHeaders}
 
-    export const useCreateProjectRole = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectRole>>, TError,CreateProjectRoleMutationVariables, TContext>, request?: SecondParameter<typeof request>}
+    /**
+ * 整表一次保存，全部成功或全部不成功。
+ * 422 的 fieldErrors 带 rowId：现有行是 id，新增行是 tempId。
+ * 409 的 latest 是 { rows: ProjectRole[], removed: string[] }：被别人改过的行和被别人删掉的行。
+ */
+export const useSaveProjectRoles = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveProjectRoles>>, TError,SaveProjectRolesMutationVariables, TContext>, request?: SecondParameter<typeof request>}
  , queryClient?: QueryClient): UseMutationReturnType<
-        Awaited<ReturnType<typeof createProjectRole>>,
+        Awaited<ReturnType<typeof saveProjectRoles>>,
         TError,
-        CreateProjectRoleMutationVariables,
+        SaveProjectRolesMutationVariables,
         TContext
       > => {
-      return useMutation(getCreateProjectRoleMutationOptions(options), queryClient);
+      return useMutation(getSaveProjectRolesMutationOptions(options), queryClient);
     }
-    export const getUpdateProjectRoleUrl = (id: string,) => {
+    export const getDeleteProjectRolesUrl = () => {
 
 
 
 
-  return `/project-roles/${id}`
+  return `/project-roles/batch-delete`
 }
 
-export const updateProjectRole = async (id: string,
-    projectRoleUpdate: ProjectRoleUpdate, options?: Parameters<typeof request>[1]): Promise<ProjectRole> => {
+/**
+ * 逐行删除，互不影响；结果逐行返回
+ */
+export const deleteProjectRoles = async (projectRoleDelete: ProjectRoleDelete, options?: Parameters<typeof request>[1]): Promise<RowResult[]> => {
 
-  return request<ProjectRole>(getUpdateProjectRoleUrl(id),
+  return request<RowResult[]>(getDeleteProjectRolesUrl(),
   {
     ...options,
-    method: 'PUT',
+    method: 'POST',
     headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
-    body: JSON.stringify(projectRoleUpdate)
+    body: JSON.stringify(projectRoleDelete)
   }
 );}
 
@@ -242,13 +334,13 @@ export const updateProjectRole = async (id: string,
 
 
 
-export const getUpdateProjectRoleMutationKey = () => ['updateProjectRole'] as const;
+export const getDeleteProjectRolesMutationKey = () => ['deleteProjectRoles'] as const;
 
-export const getUpdateProjectRoleMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectRole>>, TError,UpdateProjectRoleMutationVariables, TContext>, request?: SecondParameter<typeof request>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateProjectRole>>, TError,UpdateProjectRoleMutationVariables, TContext> => {
+export const getDeleteProjectRolesMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProjectRoles>>, TError,DeleteProjectRolesMutationVariables, TContext>, request?: SecondParameter<typeof request>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteProjectRoles>>, TError,DeleteProjectRolesMutationVariables, TContext> => {
 
-const mutationKey = getUpdateProjectRoleMutationKey();
+const mutationKey = getDeleteProjectRolesMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -258,10 +350,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateProjectRole>>, UpdateProjectRoleMutationVariables> = (props) => {
-          const {id,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteProjectRoles>>, DeleteProjectRolesMutationVariables> = (props) => {
+          const {data} = props ?? {};
 
-          return  updateProjectRole(id,data,requestOptions)
+          return  deleteProjectRoles(data,requestOptions)
         }
 
 
@@ -271,96 +363,21 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type UpdateProjectRoleMutationResult = NonNullable<Awaited<ReturnType<typeof updateProjectRole>>>
-    export type UpdateProjectRoleMutationBody = ProjectRoleUpdate
-    export type UpdateProjectRoleMutationError = ErrorType<ErrorResponse>
-    export type UpdateProjectRoleMutationVariables = {id: string;data: ProjectRoleUpdate}
+    export type DeleteProjectRolesMutationResult = NonNullable<Awaited<ReturnType<typeof deleteProjectRoles>>>
+    export type DeleteProjectRolesMutationBody = ProjectRoleDelete
+    export type DeleteProjectRolesMutationError = ErrorType<ErrorResponse>
+    export type DeleteProjectRolesMutationVariables = {data: ProjectRoleDelete}
 
-    export const useUpdateProjectRole = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectRole>>, TError,UpdateProjectRoleMutationVariables, TContext>, request?: SecondParameter<typeof request>}
+    /** 逐行删除，互不影响；结果逐行返回 */
+export const useDeleteProjectRoles = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProjectRoles>>, TError,DeleteProjectRolesMutationVariables, TContext>, request?: SecondParameter<typeof request>}
  , queryClient?: QueryClient): UseMutationReturnType<
-        Awaited<ReturnType<typeof updateProjectRole>>,
+        Awaited<ReturnType<typeof deleteProjectRoles>>,
         TError,
-        UpdateProjectRoleMutationVariables,
+        DeleteProjectRolesMutationVariables,
         TContext
       > => {
-      return useMutation(getUpdateProjectRoleMutationOptions(options), queryClient);
-    }
-    export const getDeleteProjectRoleUrl = (id: string,
-    params: DeleteProjectRoleParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/project-roles/${id}?${stringifiedParams}` : `/project-roles/${id}`
-}
-
-export const deleteProjectRole = async (id: string,
-    params: DeleteProjectRoleParams, options?: Parameters<typeof request>[1]): Promise<void> => {
-
-  return request<void>(getDeleteProjectRoleUrl(id,params),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-);}
-
-
-
-
-
-export const getDeleteProjectRoleMutationKey = () => ['deleteProjectRole'] as const;
-
-export const getDeleteProjectRoleMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProjectRole>>, TError,DeleteProjectRoleMutationVariables, TContext>, request?: SecondParameter<typeof request>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteProjectRole>>, TError,DeleteProjectRoleMutationVariables, TContext> => {
-
-const mutationKey = getDeleteProjectRoleMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteProjectRole>>, DeleteProjectRoleMutationVariables> = (props) => {
-          const {id,params} = props ?? {};
-
-          return  deleteProjectRole(id,params,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type DeleteProjectRoleMutationResult = NonNullable<Awaited<ReturnType<typeof deleteProjectRole>>>
-
-    export type DeleteProjectRoleMutationError = ErrorType<ErrorResponse>
-    export type DeleteProjectRoleMutationVariables = {id: string;params: DeleteProjectRoleParams}
-
-    export const useDeleteProjectRole = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProjectRole>>, TError,DeleteProjectRoleMutationVariables, TContext>, request?: SecondParameter<typeof request>}
- , queryClient?: QueryClient): UseMutationReturnType<
-        Awaited<ReturnType<typeof deleteProjectRole>>,
-        TError,
-        DeleteProjectRoleMutationVariables,
-        TContext
-      > => {
-      return useMutation(getDeleteProjectRoleMutationOptions(options), queryClient);
+      return useMutation(getDeleteProjectRolesMutationOptions(options), queryClient);
     }
     export const getSetProjectRoleStatusUrl = (id: string,) => {
 

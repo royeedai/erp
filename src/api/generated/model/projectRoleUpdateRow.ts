@@ -8,7 +8,7 @@
  *
  * OpenAPI spec version: 0.1.0
  */
+import type { ProjectRoleValues } from './projectRoleValues';
+import type { RowVersion } from './rowVersion';
 
-export type DeleteProjectRoleParams = {
-  version: number;
-};
+export type ProjectRoleUpdateRow = ProjectRoleValues & RowVersion;

@@ -11,13 +11,6 @@
 
 export type ListProjectRolesParams = {
   orgId: string;
-  keyword?: string;
-  enabled?: boolean;
-  /** @minimum 1 */
-  page: number;
-  /**
-   * @minimum 1
-   * @maximum 200
-   */
-  size: number;
+  categoryId: string;
+  includeDisabled?: boolean;
 };

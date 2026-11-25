@@ -33,7 +33,7 @@ export const useTabsStore = defineStore('tabs', () => {
     return !!find(key) || !isFull.value
   }
 
-  /** 固定页签（如工作台）始终排在最前，且不受“从哪个地址进来”影响 */
+  /** 固定页签（如首页）始终排在最前，且不受“从哪个地址进来”影响 */
   function pin(path: string, title: string) {
     if (find(path)) return
     const at = tabs.value.filter((t) => !t.closable).length

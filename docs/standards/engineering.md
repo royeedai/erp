@@ -11,8 +11,8 @@
 
 | 升级谁 | 必须做 |
 |---|---|
-| vxe-table | 单独走验证，重跑 `trial2 E` 连按测试：`EditTable` 用了类型声明里没有的 `isPos` |
-| Element Plus | 按 [motion.md](motion.md) 重看对比页 |
+| vxe-table | 单独走验证，重跑 `trial2 E` 连按测试：`EditTable` 用了类型声明里没有的 `isPos`；`useScrollSync` 补的固定列同步要重看 |
+| Element Plus | 按 [motion.md](motion.md) 重看对比页；`src/theme/controls.css` 靠类名覆盖，逐屏看一遍 |
 | ESLint、Stylelint 及插件 | `tests/guard` 全过，它会抓到悄悄失效的护栏 |
 
 ## 目录
@@ -22,10 +22,12 @@ src/app/                   路由、权限码、会话、页签、布局
 src/api/generated/         orval 产物，不手改
 src/api/http.ts            唯一的请求出口
 src/shared/ui/             组合封装
+src/shared/entry/          录入逻辑，不含界面
 src/shared/patterns/       页面模式（还没建）
 src/features/<域>/<资源>/   业务目录：只写字段、规则、业务动作
 src/theme/                 token 与动效，唯一一份
 src/mocks/                 MSW 模拟接口，不进正式包
+src/samples/               封装的样例页，只在模拟模式有
 lint/、tests/guard/        护栏清单与回归
 ```
 
@@ -36,13 +38,20 @@ lint/、tests/guard/        护栏清单与回归
 
 | 规范名 | 现状 |
 |---|---|
-| `AppShell` | `src/app/layout/AppShell.vue`，导航还是侧栏，待按 [ux.md](ux.md#导航与组织) 改 |
-| `QueryBar` | 有，还是单行工具条，待按 [list.md](list.md#查询) 重做 |
-| `DataTable` | 有，缺勾选、序号、合计行、列设置 |
-| `FormDialog` | 有；未保存、字段错误、冲突、幂等的逻辑待拆出来，给整页卡片和表内编辑共用 |
-| `EditTable` `AmountInput` `StatusTag` `ActionBar` `ConflictDialog` | 有 |
-| `confirm` `toast` | 有，在 `src/shared/ui/feedback.ts` |
-| `PageHeader` `BillPage` `RefPicker` `SourcePicker` `AmountText` `ApprovalPanel` `DocTrace` `ChangeCompare` `ImportWizard` `BatchResult` `AttachmentList` | 还没有 |
+| `AppShell` | 有，在 `src/app/layout/` 和 `src/app/tabs/`；全部应用、应用搜索、面包屑、首页常用应用都取自路由的 `meta.nav`（业务域、模块、分组）、`icon`、`tone` |
+| `PageHeader` | 有：图标、标题、`after` 插槽（组织、显示停用）、动作 |
+| `QueryBar` `StatusTabs` | 有：查询方案、条件、查询、高级查询、更多、收起；状态页签在表格上方 |
+| `DataTable` `ColumnSettings` `EmptyHint` | 有：勾选、序号、按类型排宽、操作列、合计行、列设置（含行高）、底部、五种空态 |
+| `EditTable` | 有：单据明细和表内编辑共用；勾选、操作列、列设置、开关列、错误摘要 |
+| `DetailBar` | 有：明细条，名称和行数、已选、动作、收起、全屏 |
+| `RefPicker` | 有树形单选：搜索、显示停用、候选范围；多选、列表型、包含下级还没有 |
+| `useSubmit` `useEntryForm` `useEntryTable` | 有，在 `src/shared/entry/`：未保存、字段错误、幂等、冲突、连点，整页卡片、对话框、表内编辑共用 |
+| `FormDialog` `ConflictDialog` | 有；对话框只管布局，逻辑在 `useEntryForm` |
+| `AmountInput` `StatusTag` `ActionBar` `AppIcon` | 有 |
+| `confirm` `confirmWithReason` `promptText` `alertError` `toast` | 有，在 `src/shared/ui/feedback.ts` |
+| `BillPage` `SourcePicker` `AmountText` `ApprovalPanel` `DocTrace` `ChangeCompare` `ImportWizard` `BatchResult` `AttachmentList` | 还没有 |
+
+列表封装没有真实页面在用，样子和端到端都在 `src/samples/`，只在模拟模式登记，正式包里没有。
 
 ## 页面：生成到什么程度
 

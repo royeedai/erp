@@ -8,8 +8,8 @@
  *
  * OpenAPI spec version: 0.1.0
  */
-import type { IdempotencyKeyParameter } from './idempotencyKeyParameter';
+import type { RowVersion } from './rowVersion';
 
-export type CreateProjectRoleHeaders = {
-  'Idempotency-Key': IdempotencyKeyParameter;
-};
+export interface ProjectRoleDelete {
+  items: RowVersion[];
+}

@@ -1,12 +1,12 @@
-/* 视觉 token：覆盖 Element Plus 2.14 的 CSS 变量。业务代码只用变量，不写颜色值。 */
+/* 视觉 token：覆盖 Element Plus 2.14 的 CSS 变量。业务代码只用变量，不写颜色值。数值按 examples/ref-prototype/。 */
 :root {
-  --el-color-primary: #1D5BBF;
-  --el-color-primary-light-3: #618CD2;
-  --el-color-primary-light-5: #8EADDF;
-  --el-color-primary-light-7: #BBCEEC;
-  --el-color-primary-light-8: #D2DEF2;
-  --el-color-primary-light-9: #E8EFF9;
-  --el-color-primary-dark-2: #174999;
+  --el-color-primary: #E01128;
+  --el-color-primary-light-3: #E95869;
+  --el-color-primary-light-5: #F08894;
+  --el-color-primary-light-7: #F6B8BF;
+  --el-color-primary-light-8: #F9CFD4;
+  --el-color-primary-light-9: #FCE7EA;
+  --el-color-primary-dark-2: #B30E20;
 
   --el-color-success: #176B45;
   --el-color-success-light-3: #5D977D;
@@ -40,25 +40,33 @@
   --el-color-error-light-9: #F8E9E8;
   --el-color-error-dark-2: #901C13;
 
-  --el-color-info: #475467;
-  --el-color-info-light-3: #7E8795;
-  --el-color-info-light-5: #A3AAB3;
-  --el-color-info-light-7: #C8CCD1;
-  --el-color-info-light-8: #DADDE1;
-  --el-color-info-light-9: #EDEEF0;
-  --el-color-info-dark-2: #394352;
+  --el-color-info: #55555C;
+  --el-color-info-light-3: #88888D;
+  --el-color-info-light-5: #AAAAAD;
+  --el-color-info-light-7: #CCCCCE;
+  --el-color-info-light-8: #DDDDDE;
+  --el-color-info-light-9: #EEEEEF;
+  --el-color-info-dark-2: #44444A;
 
-  --el-text-color-primary: #182230;
-  --el-text-color-regular: #475467;
-  --el-text-color-secondary: #586679;
-  --el-border-color: #8793A3;
-  --el-border-color-light: #D5DCE5;
-  --el-border-color-lighter: #D5DCE5;
-  --el-bg-color-page: #F4F6F8;
-  --el-border-radius-base: 4px;
-  --el-font-size-base: 14px;
-  --el-font-family: system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --el-overlay-color-lighter: rgba(16, 24, 40, .45);
+  --el-text-color-primary: #25252B;
+  --el-text-color-regular: #35353B;
+  --el-text-color-secondary: #706F77;
+  --el-text-color-placeholder: #BAB8C0;
+  --el-text-color-disabled: #ABA9B1;
+  --el-border-color: #D5D3DA;
+  --el-border-color-hover: #B4B2BC;
+  --el-border-color-light: #EAE7EE;
+  --el-border-color-lighter: #EAE7EE;
+  --el-disabled-bg-color: #F5F3F6;
+  --el-disabled-border-color: #DFDDE3;
+  --el-disabled-text-color: #6F6E76;
+  --el-bg-color-page: #E1E1EC;
+  --el-border-radius-base: 3px;
+  --el-component-size: 26px;
+  --el-font-size-base: 12px;
+  --el-font-size-small: 12px;
+  --el-font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  --el-overlay-color-lighter: rgba(0, 0, 0, .3);
 
-  --app-shadow-float: 0 8px 24px rgba(16, 24, 40, .14), 0 2px 6px rgba(16, 24, 40, .08);
+  --app-shadow-float: 0 4px 16px rgba(30, 30, 60, .18);
 }

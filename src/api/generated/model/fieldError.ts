@@ -10,6 +10,8 @@
  */
 
 export interface FieldError {
+  /** 表内编辑时错误在哪一行；新增行是提交时的 tempId */
+  rowId?: string;
   field: string;
   message: string;
 }

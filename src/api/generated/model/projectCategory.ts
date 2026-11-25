@@ -9,10 +9,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type OrgNodeLevel = typeof OrgNodeLevel[keyof typeof OrgNodeLevel];
-
-
-export const OrgNodeLevel = {
-  group: 'group',
-  org: 'org',
-} as const;
+export interface ProjectCategory {
+  id: string;
+  code: string;
+  name: string;
+  /** 能不能在这个节点下维护岗位；父分类也可以，不看有没有子节点 */
+  canMaintain: boolean;
+  /** 不能维护时的原因，直接展示给用户 */
+  reason?: string;
+  children: ProjectCategory[];
+}

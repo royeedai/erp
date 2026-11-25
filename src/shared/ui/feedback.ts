@@ -1,4 +1,5 @@
 // 全工程唯一允许 import ElMessage / ElMessageBox 的位置。业务代码只用 toast / confirm。
+import { h } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { markMessageBoxOrigin } from '@/theme/motion'
 
@@ -19,11 +20,13 @@ export interface ConfirmOptions {
   danger?: boolean
 }
 
+const body = (title: string, message: string) => h('div', [h('h3', title), h('p', message)])
+
 /** 返回 true 表示确认；取消和关闭都是 false，不抛异常 */
 export async function confirm(options: ConfirmOptions): Promise<boolean> {
   markMessageBoxOrigin()
   try {
-    await ElMessageBox.confirm(options.message, options.title, {
+    await ElMessageBox.confirm(body(options.title, options.message), '提示信息', {
       type: 'warning',
       confirmButtonText: options.confirmText ?? '确定',
       cancelButtonText: options.cancelText ?? '取消',
@@ -38,11 +41,33 @@ export async function confirm(options: ConfirmOptions): Promise<boolean> {
   }
 }
 
+/** 填一个短文本，例如查询方案的名称。取消返回 null */
+export async function promptText(options: ConfirmOptions & { label: string; max?: number }): Promise<string | null> {
+  const max = options.max ?? 20
+  markMessageBoxOrigin()
+  try {
+    const result: unknown = await ElMessageBox.prompt(body(options.title, options.message), '提示信息', {
+      confirmButtonText: options.confirmText ?? '确定',
+      cancelButtonText: options.cancelText ?? '取消',
+      inputPlaceholder: options.label,
+      inputValidator: (v) => {
+        const text = (v ?? '').trim()
+        if (text === '') return `请填写${options.label}`
+        return text.length <= max || `最多 ${max} 个字`
+      },
+      closeOnClickModal: false,
+    })
+    return result !== null && typeof result === 'object' && 'value' in result ? String(result.value).trim() : null
+  } catch {
+    return null
+  }
+}
+
 /** 不可逆动作：必须填原因。返回原因文本，取消返回 null */
 export async function confirmWithReason(options: ConfirmOptions & { reasonLabel?: string }): Promise<string | null> {
   markMessageBoxOrigin()
   try {
-    const result: unknown = await ElMessageBox.prompt(options.message, options.title, {
+    const result: unknown = await ElMessageBox.prompt(body(options.title, options.message), '提示信息', {
       confirmButtonText: options.confirmText ?? '确定',
       cancelButtonText: options.cancelText ?? '取消',
       confirmButtonType: options.danger ? 'danger' : 'primary',
@@ -61,7 +86,7 @@ export async function confirmWithReason(options: ConfirmOptions & { reasonLabel?
 export async function alertError(title: string, message: string): Promise<void> {
   markMessageBoxOrigin()
   try {
-    await ElMessageBox.alert(message, title, { type: 'error', confirmButtonText: '知道了', closeOnClickModal: false })
+    await ElMessageBox.alert(body(title, message), '提示信息', { type: 'error', confirmButtonText: '知道了', closeOnClickModal: false })
   } catch {
     /* 关闭即可 */
   }

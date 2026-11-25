@@ -2,9 +2,35 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "erp-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "dev"
+      ],
+      "port": 5173,
+      "url": "http://127.0.0.1:5173"
+    },
+    {
+      "name": "ref-prototype",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "exec",
+        "vite",
+        "--config",
+        "examples/ref-prototype/vite.config.ts"
+      ],
+      "port": 5184,
+      "url": "http://127.0.0.1:5184"
+    },
+    {
       "name": "supplier-prototype",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["exec", "vite", "--config", "examples/supplier-prototype/vite.config.ts"],
+      "runtimeArgs": [
+        "exec",
+        "vite",
+        "--config",
+        "examples/supplier-prototype/vite.config.ts"
+      ],
       "port": 5183,
       "url": "http://127.0.0.1:5183"
     }

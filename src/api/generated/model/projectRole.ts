@@ -13,10 +13,10 @@ import type { AllowedAction } from './allowedAction';
 export interface ProjectRole {
   id: string;
   orgId: string;
-  orgName: string;
+  categoryId: string;
   code: string;
   name: string;
-  /** 经理岗位，每个组织只能有一个 */
+  /** 是否项目经理。唯一的范围是哪一层业务还没答复，由后端校验，前端不写 */
   isManager: boolean;
   enabled: boolean;
   /** @nullable */

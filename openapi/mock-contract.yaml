@@ -10,6 +10,7 @@ servers:
   - url: /api
 tags:
   - name: auth
+  - name: home
   - name: org
   - name: projectRole
 paths:
@@ -48,18 +49,50 @@ paths:
         '204':
           description: 已退出
         default: { $ref: '#/components/responses/Error' }
+  /home/summary:
+    get:
+      tags: [home]
+      operationId: getHomeSummary
+      responses:
+        '200':
+          description: 首页的待办计数和本角色的任务
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HomeSummary' }
+        default: { $ref: '#/components/responses/Error' }
   /orgs/tree:
     get:
       tags: [org]
       operationId: getOrgTree
+      parameters:
+        - name: type
+          in: query
+          required: true
+          description: 每个页面用自己的组织类型
+          schema: { type: string, enum: [project] }
       responses:
         '200':
-          description: 组织树
+          description: 当前用户有权的组织树
           content:
             application/json:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/OrgNode' }
+        default: { $ref: '#/components/responses/Error' }
+  /project-categories/tree:
+    get:
+      tags: [projectRole]
+      operationId: getProjectCategoryTree
+      parameters:
+        - { name: orgId, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: 项目基本分类树
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ProjectCategory' }
         default: { $ref: '#/components/responses/Error' }
   /project-roles:
     get:
@@ -67,63 +100,57 @@ paths:
       operationId: listProjectRoles
       parameters:
         - { name: orgId, in: query, required: true, schema: { type: string } }
-        - { name: keyword, in: query, schema: { type: string } }
-        - name: enabled
+        - { name: categoryId, in: query, required: true, schema: { type: string } }
+        - name: includeDisabled
           in: query
           schema: { type: boolean }
-        - { name: page, in: query, required: true, schema: { type: integer, minimum: 1 } }
-        - { name: size, in: query, required: true, schema: { type: integer, minimum: 1, maximum: 200 } }
       responses:
         '200':
-          description: 分页列表
+          description: 这个分类自己定义的岗位，不分页
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ProjectRolePage' }
+              schema: { $ref: '#/components/schemas/ProjectRoleList' }
         default: { $ref: '#/components/responses/Error' }
+  /project-roles/batch-save:
     post:
       tags: [projectRole]
-      operationId: createProjectRole
+      operationId: saveProjectRoles
+      description: |
+        整表一次保存，全部成功或全部不成功。
+        422 的 fieldErrors 带 rowId：现有行是 id，新增行是 tempId。
+        409 的 latest 是 { rows: ProjectRole[], removed: string[] }：被别人改过的行和被别人删掉的行。
       parameters:
         - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ProjectRoleCreate' }
-      responses:
-        '201':
-          description: 已新增
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProjectRole' }
-        default: { $ref: '#/components/responses/Error' }
-  /project-roles/{id}:
-    put:
-      tags: [projectRole]
-      operationId: updateProjectRole
-      parameters:
-        - { $ref: '#/components/parameters/Id' }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/ProjectRoleUpdate' }
+            schema: { $ref: '#/components/schemas/ProjectRoleSave' }
       responses:
         '200':
           description: 已保存
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ProjectRole' }
+              schema: { $ref: '#/components/schemas/ProjectRoleList' }
         default: { $ref: '#/components/responses/Error' }
-    delete:
+  /project-roles/batch-delete:
+    post:
       tags: [projectRole]
-      operationId: deleteProjectRole
-      parameters:
-        - { $ref: '#/components/parameters/Id' }
-        - { name: version, in: query, required: true, schema: { type: integer } }
+      operationId: deleteProjectRoles
+      description: 逐行删除，互不影响；结果逐行返回
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProjectRoleDelete' }
       responses:
-        '204':
-          description: 已删除
+        '200':
+          description: 逐行结果
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RowResult' }
         default: { $ref: '#/components/responses/Error' }
   /project-roles/{id}/status:
     put:
@@ -183,17 +210,82 @@ components:
         permissions:
           type: array
           items: { type: string }
+    HomeTodos:
+      type: object
+      description: 四个中心各有几条待处理
+      required: [approval, business, warning, notice]
+      properties:
+        approval: { type: integer }
+        business: { type: integer }
+        warning: { type: integer }
+        notice: { type: integer }
+    HomeDraft:
+      type: object
+      required: [id, no, party, amount, date]
+      properties:
+        id: { type: string }
+        no: { type: string }
+        party: { type: string, description: 往来单位 }
+        amount: { type: string }
+        date: { type: string }
+    HomeItem:
+      type: object
+      required: [key, label, value]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        value: { type: string, description: 计数或金额，按字符串给 }
+        unit: { type: string, description: 行、份、张 }
+        path: { type: string, description: 点了去哪个应用；没有就不能点 }
+        drafts:
+          type: array
+          description: 待提交单据的明细
+          items: { $ref: '#/components/schemas/HomeDraft' }
+    HomeCard:
+      type: object
+      required: [key, type, title, span, items]
+      properties:
+        key: { type: string }
+        type: { type: string, enum: [metrics, counts, drafts], description: 指标、计数、待提交单据 }
+        title: { type: string }
+        span: { type: integer, minimum: 1, maximum: 3, description: 占三列里的几列 }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/HomeItem' }
+    HomeSummary:
+      type: object
+      required: [todos, cards]
+      properties:
+        todos: { $ref: '#/components/schemas/HomeTodos' }
+        cards:
+          type: array
+          description: 本角色的任务，按角色由后端配
+          items: { $ref: '#/components/schemas/HomeCard' }
     OrgNode:
       type: object
-      required: [id, code, name, level, children]
+      required: [id, code, name, enabled, children]
       properties:
         id: { type: string }
         code: { type: string }
         name: { type: string }
-        level: { type: string, enum: [group, org] }
+        enabled: { type: boolean }
         children:
           type: array
           items: { $ref: '#/components/schemas/OrgNode' }
+    ProjectCategory:
+      type: object
+      required: [id, code, name, canMaintain, children]
+      properties:
+        id: { type: string }
+        code: { type: string }
+        name: { type: string }
+        canMaintain: { type: boolean, description: 能不能在这个节点下维护岗位；父分类也可以，不看有没有子节点 }
+        reason:
+          type: string
+          description: 不能维护时的原因，直接展示给用户
+        children:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectCategory' }
     AllowedAction:
       type: object
       required: [action, allowed]
@@ -205,14 +297,14 @@ components:
           description: 不允许时的原因，直接展示给用户
     ProjectRole:
       type: object
-      required: [id, orgId, orgName, code, name, isManager, enabled, refCount, version, updatedAt, updatedBy, allowedActions]
+      required: [id, orgId, categoryId, code, name, isManager, enabled, refCount, version, updatedAt, updatedBy, allowedActions]
       properties:
         id: { type: string }
         orgId: { type: string }
-        orgName: { type: string }
+        categoryId: { type: string }
         code: { type: string }
         name: { type: string }
-        isManager: { type: boolean, description: 经理岗位，每个组织只能有一个 }
+        isManager: { type: boolean, description: 是否项目经理。唯一的范围是哪一层业务还没答复，由后端校验，前端不写 }
         enabled: { type: boolean }
         remark: { type: string, nullable: true }
         refCount: { type: integer, description: 被项目引用的次数 }
@@ -222,41 +314,81 @@ components:
         allowedActions:
           type: array
           items: { $ref: '#/components/schemas/AllowedAction' }
-    ProjectRoleCounts:
+    InheritedRoles:
       type: object
-      description: 当前组织和关键字下各状态的条数，不受 enabled 条件影响
-      required: [all, enabled, disabled]
+      description: 这个分类没定义岗位时，实际取的是哪个上级分类的
+      required: [categoryId, categoryName, count]
       properties:
-        all: { type: integer }
-        enabled: { type: integer }
-        disabled: { type: integer }
-    ProjectRolePage:
+        categoryId: { type: string }
+        categoryName: { type: string }
+        count: { type: integer }
+    ProjectRoleList:
       type: object
-      required: [list, total, counts]
+      required: [list]
       properties:
         list:
           type: array
           items: { $ref: '#/components/schemas/ProjectRole' }
-        total: { type: integer }
-        counts: { $ref: '#/components/schemas/ProjectRoleCounts' }
-    ProjectRoleCreate:
+        inheritedFrom: { $ref: '#/components/schemas/InheritedRoles' }
+    ProjectRoleValues:
       type: object
-      required: [orgId, code, name, isManager]
+      required: [code, name, isManager, enabled]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        isManager: { type: boolean }
+        enabled: { type: boolean }
+        remark: { type: string, nullable: true }
+    ProjectRoleCreateRow:
+      allOf:
+        - { $ref: '#/components/schemas/ProjectRoleValues' }
+        - type: object
+          required: [tempId]
+          properties:
+            tempId: { type: string, description: 只在这次保存里有效，报错时指到行 }
+    ProjectRoleUpdateRow:
+      allOf:
+        - { $ref: '#/components/schemas/ProjectRoleValues' }
+        - { $ref: '#/components/schemas/RowVersion' }
+    RowVersion:
+      type: object
+      required: [id, version]
+      properties:
+        id: { type: string }
+        version: { type: integer }
+    ProjectRoleSave:
+      type: object
+      required: [orgId, categoryId, created, updated, removed]
       properties:
         orgId: { type: string }
-        code: { type: string }
-        name: { type: string }
-        isManager: { type: boolean }
-        remark: { type: string, nullable: true }
-    ProjectRoleUpdate:
+        categoryId: { type: string }
+        created:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectRoleCreateRow' }
+        updated:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectRoleUpdateRow' }
+        removed:
+          type: array
+          items: { $ref: '#/components/schemas/RowVersion' }
+    ProjectRoleDelete:
       type: object
-      required: [code, name, isManager, version]
+      required: [items]
       properties:
-        code: { type: string }
-        name: { type: string }
-        isManager: { type: boolean }
-        remark: { type: string, nullable: true }
-        version: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/RowVersion' }
+    RowResult:
+      type: object
+      required: [id, title, ok]
+      properties:
+        id: { type: string }
+        title: { type: string, description: 这一行怎么称呼，例如“GC01 项目经理” }
+        ok: { type: boolean }
+        message: { type: string, description: 没成功的原因 }
+        references:
+          type: array
+          items: { type: string }
     StatusBody:
       type: object
       required: [enabled, version]
@@ -267,6 +399,7 @@ components:
       type: object
       required: [field, message]
       properties:
+        rowId: { type: string, description: 表内编辑时错误在哪一行；新增行是提交时的 tempId }
         field: { type: string }
         message: { type: string }
     ApiErrorBody:

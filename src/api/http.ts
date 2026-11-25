@@ -1,6 +1,8 @@
 // 唯一的请求出口。业务代码只用 orval 生成的函数，不直接调这里，更不写裸 fetch。
 
 export interface FieldError {
+  /** 表内编辑：错误在哪一行；新增的行用提交时的 tempId */
+  rowId?: string
   field: string
   message: string
 }

@@ -9,11 +9,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface ProjectRoleUpdate {
-  code: string;
-  name: string;
-  isManager: boolean;
-  /** @nullable */
-  remark?: string | null;
-  version: number;
-}
+export type GetOrgTreeType = typeof GetOrgTreeType[keyof typeof GetOrgTreeType];
+
+
+export const GetOrgTreeType = {
+  project: 'project',
+} as const;

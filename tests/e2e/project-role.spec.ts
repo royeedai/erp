@@ -1,372 +1,429 @@
-import { expect, test, type Page } from '@playwright/test'
-import { readFileSync } from 'node:fs'
+// 项目岗位：表内编辑档案（带左树）。
+import { expect, test, type Page, type Request } from '@playwright/test'
+import { actionOf, box, call, dialog, login, moreOf, overlayGone, rowOf, seen, toastText, watchConsole } from './helpers'
 
-const users = JSON.parse(readFileSync(new URL('../../src/mocks/users.json', import.meta.url), 'utf8')) as {
-  username: string
-  password: string
-}[]
+watchConsole()
 
-const consoleErrors: string[] = []
-
-test.beforeEach(({ page }) => {
-  consoleErrors.length = 0
-  page.on('pageerror', (e) => consoleErrors.push(`pageerror ${e.message}`))
-  page.on('console', (m) => {
-    // 4xx 是用例故意制造的，浏览器会自己打一行，不算错误
-    if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) consoleErrors.push(m.text())
-    if (m.type() === 'warning' && /\[Vue warn\]|\[vxe/.test(m.text())) consoleErrors.push(m.text())
-  })
-})
-test.afterEach(() => {
-  expect(consoleErrors, '控制台不应有报错').toEqual([])
-})
-
-async function login(page: Page, username: string, path = '/project/roles') {
-  const user = users.find((u) => u.username === username)!
-  await page.goto(path)
-  await page.locator('input[name="username"]').fill(user.username)
-  await page.locator('input[name="password"]').fill(user.password)
-  await page.getByRole('button', { name: '登录' }).click()
+const PATH = '/project/roles'
+const category = (page: Page, text: string) => page.locator('.role-tree .app-tree-node', { hasText: text })
+const btn = (page: Page, name: string) => page.locator('.app-detail-bar').getByRole('button', { name, exact: true })
+const name = (page: Page) => page.locator('.app-detail-name')
+const problems = (page: Page) => page.locator('.app-edit-problems')
+const editor = (page: Page) => page.locator('.vxe-body--column input.el-input__inner').filter({ visible: true })
+/** 进 GC 工程类：6 个启用的岗位 */
+const open = async (page: Page, user = 'admin') => {
+  await login(page, user, `${PATH}?org=G&category=GC`)
+  await expect(rowOf(page, 'GC01')).toBeVisible()
+  await overlayGone(page)
+}
+const add = async (page: Page) => {
+  await btn(page, '增行').click()
+  await expect(editor(page)).toBeFocused()
+}
+const saves = (page: Page) => {
+  const list: Request[] = []
+  page.on('request', (r) => r.url().endsWith('/batch-save') && list.push(r))
+  return list
 }
 
-// 横滚时固定列在另一张表里，按行号找才稳
-const rowOf = (page: Page, text: string) => page.locator('.vxe-body--row', { hasText: text }).filter({ visible: true }).first()
-async function idOf(page: Page, text: string) {
-  await rowOf(page, text).waitFor()
-  return rowOf(page, text).getAttribute('rowid')
-}
-const mainRow = async (page: Page, text: string) => page.locator(`.vxe-table--main-wrapper tr[rowid="${await idOf(page, text)}"]`)
-const mainRows = (page: Page) => page.locator('.vxe-table--main-wrapper .vxe-body--row')
-async function actionOf(page: Page, text: string, action: string) {
-  const id = await idOf(page, text)
-  // 不横滚时操作列在主表里，横滚时在右固定列里：按行号取可见的那一个
-  return page.locator(`tr[rowid="${id}"] [data-action="${action}"]`).filter({ visible: true }).last()
-}
-/** “更多”里的动作 */
-async function moreOf(page: Page, text: string, action: string) {
-  await (await actionOf(page, text, 'more')).click()
-  return page.locator(`.el-dropdown-menu [data-action="${action}"]`).filter({ visible: true })
-}
-const box = (page: Page) => page.locator('.el-message-box')
-const org = (page: Page, name: string) => page.locator('.el-tree-node__content', { hasText: name }).click()
-const toastText = (page: Page, text: string) => expect(page.locator('.el-message', { hasText: text })).toBeVisible()
-const call = (page: Page, path: string) => page.evaluate((p) => fetch(p, { method: 'POST' }).then((r) => r.status), path)
-const dialog = (page: Page, title: string) => page.locator('.el-dialog', { hasText: title })
+test('组织和分类：默认带出组织，根节点不能维护，父分类能维护，地址记住', async ({ page }) => {
+  await login(page, 'admin', PATH)
+  await expect(page.locator('.role-org input')).toHaveValue('01 示例集团')
+  await expect(category(page, '项目基本分类')).toBeVisible()
+  await expect(seen(page, '这里没有岗位')).toHaveCount(1)
+  await expect(page.locator('.app-detail-reason')).toHaveText('这一层不能维护岗位，请选下面的分类')
+  await expect(btn(page, '增行')).toHaveCount(0)
 
-test('登录：未登录跳转、密码错误、登录后回到原地址、刷新仍在', async ({ page }) => {
-  await page.goto('/project/roles?org=O1')
-  await expect(page).toHaveURL(/\/login\?redirect=/)
-  await page.getByRole('button', { name: '登录' }).click()
-  await expect(page.getByText('请输入账号')).toBeVisible()
-  await page.locator('input[name="username"]').fill('admin')
-  await page.locator('input[name="password"]').fill('wrong')
-  await page.getByRole('button', { name: '登录' }).click()
-  await expect(page.locator('.login-error')).toContainText('账号或密码错误')
-  await login(page, 'admin', '/project/roles?org=O1')
-  await expect(page).toHaveURL(/\/project\/roles\?org=O1/)
-  await expect(rowOf(page, '项目经理')).toBeVisible()
+  await category(page, 'GC 工程类').click()
+  await expect(name(page)).toHaveText('岗位 (6)')
+  await expect(page).toHaveURL(/org=G&category=GC$/)
+  await expect(btn(page, '增行')).toBeEnabled()
+  await expect(btn(page, '删除')).toBeDisabled()
+  // 父分类自己有岗位，下级没定义就写明用的是谁的
+  await page.locator('.role-tree .el-tree-node', { hasText: 'GC 工程类' }).last().locator('.el-tree-node__expand-icon').first().click()
+  await category(page, 'GC-002 市政工程').click()
+  await expect(seen(page, '现在用的是上级分类 GC 工程类 的 6 个岗位')).toHaveCount(1)
+  await category(page, 'GC-001 房建工程').click()
+  await expect(name(page)).toHaveText('岗位 (2)')
+
+  await page.locator('.el-checkbox', { hasText: '显示停用岗位' }).click()
+  await category(page, 'GC 工程类').first().click()
+  await expect(name(page)).toHaveText('岗位 (7)')
+  await expect(page).toHaveURL(/disabled=true/)
   await page.reload()
-  await expect(rowOf(page, '项目经理')).toBeVisible()
-  await expect(page.locator('[data-tab="/project/roles"]')).toBeVisible()
+  await expect(name(page)).toHaveText('岗位 (7)')
+  // 收起树、收起表
+  await page.getByRole('button', { name: '收起分类树' }).click()
+  await expect(page.locator('.role-tree')).toBeHidden()
+  await page.getByRole('button', { name: '展开分类树' }).click()
+  await page.getByRole('button', { name: '收起岗位' }).click()
+  await expect(page.locator('.app-edit-table')).toBeHidden()
 })
 
-test('查询：组织切换、回车才查、条件进地址、筛选为空、重置、分页', async ({ page }) => {
-  await login(page, 'admin')
-  await expect(mainRows(page)).toHaveCount(2)
-  await org(page, '华东公司')
-  await expect(page.locator('.el-pagination__total')).toContainText('69')
-  await expect(page).toHaveURL(/org=O1/)
-
-  const keyword = page.locator('input[name="keyword"]')
-  await keyword.fill('造价')
-  await page.waitForTimeout(400)
-  await expect(page).not.toHaveURL(/keyword/)
-  await keyword.press('Enter')
-  await expect(page).toHaveURL(/keyword=/)
-  await expect(page.locator('.el-pagination__total')).toContainText('7')
-
-  await keyword.fill('不存在的岗位')
-  await page.getByRole('button', { name: '查询', exact: true }).click()
-  await expect(page.getByText('没有符合条件的岗位').filter({ visible: true })).toHaveCount(1)
-  await page.screenshot({ path: 'test-results/empty.png' })
-
-  await page.getByRole('button', { name: '清空条件' }).filter({ visible: true }).click()
-  await expect(page.locator('.el-pagination__total')).toContainText('69')
-  await page.locator('.el-pager li', { hasText: '2' }).click()
-  await expect(page).toHaveURL(/page=2/)
-  // 去别的页签再回来，条件还在
-  await page.locator('[data-tab="/home"]').click()
-  await expect(page.getByText('你好')).toBeVisible()
-  await page.locator('[data-tab="/project/roles"]').click()
-  await expect(page).toHaveURL(/org=O1.*page=2/)
-  await expect(page.locator('.el-pager li.is-active')).toHaveText('2')
+test('换项目组织：只列有权的，停用的默认不列', async ({ page }) => {
+  await open(page)
+  await page.getByRole('button', { name: '选择项目组织' }).click()
+  const d = dialog(page, '项目组织')
+  await expect(d.locator('.app-tree-node')).toHaveText(['01 示例集团', '0101 华东项目部', '0102 华南项目部'])
+  await d.locator('.app-tree-node', { hasText: '华南项目部' }).click()
+  await d.getByRole('button', { name: '确定' }).click()
+  await expect(page).toHaveURL(/org=O2/)
+  await expect(seen(page, 'GC 工程类下还没有岗位')).toHaveCount(1)
+  await expect(page.locator('.role-org input')).toHaveValue('0102 华南项目部')
 })
 
-test('状态页签：条数随关键字变，点了立即查，进地址', async ({ page }) => {
-  await login(page, 'admin', '/project/roles?org=O1')
-  const tabOf = (name: string) => page.locator('.app-query-tabs').getByRole('tab', { name })
-  await expect(tabOf('全部')).toContainText('69')
-  await expect(tabOf('已停用')).toContainText('1')
-  await tabOf('已停用').click()
-  await expect(page).toHaveURL(/enabled=false/)
-  await expect(mainRows(page)).toHaveCount(1)
-  await page.locator('input[name="keyword"]').fill('造价')
-  await page.locator('input[name="keyword"]').press('Enter')
-  await expect(tabOf('全部')).toContainText('7')
-  await expect(page.getByText('没有符合条件的岗位').filter({ visible: true })).toHaveCount(1)
+test('增行：加在末尾、焦点进第一格、默认值填好、回车到下一格；没填过取消不问', async ({ page }) => {
+  await open(page)
+  await expect(page.locator('.app-col-required')).toHaveCount(0)
+  await add(page)
+  await expect(name(page)).toHaveText('岗位 (7)')
+  await expect(page.locator('.app-col-required').filter({ visible: true })).toHaveCount(4)
+  await expect(editor(page)).toHaveAttribute('aria-label', '岗位编码')
+  const last = page.locator('.vxe-body--row[rowid^="new-"]').filter({ visible: true })
+  await expect(last.locator('.el-switch').nth(0)).not.toHaveClass(/is-checked/)
+  await expect(last.locator('.el-switch').nth(1)).toHaveClass(/is-checked/)
+  // 主按钮换成保存，取消在它右边；增行照常，组织和停用锁住
+  await expect(btn(page, '保存')).toHaveClass(/el-button--primary/)
+  await expect(btn(page, '取消')).toBeVisible()
+  await expect(btn(page, '修改')).toHaveCount(0)
+  await expect(page.locator('.role-org input')).toBeDisabled()
+  await page.keyboard.type('GC20')
+  await page.keyboard.press('Enter')
+  await expect(editor(page)).toHaveAttribute('aria-label', '岗位名称')
+  await page.keyboard.type('测量员')
+  await page.keyboard.press('Enter')
+  // 开关也在回车路上：空格切换
+  await expect(last.getByRole('switch', { name: '是否项目经理' })).toBeFocused()
+  await page.keyboard.press('Space')
+  await expect(last.locator('.el-switch').nth(0)).toHaveClass(/is-checked/)
+  await page.keyboard.press('Enter')
+  await expect(last.getByRole('switch', { name: '启用状态' })).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(editor(page)).toHaveAttribute('aria-label', '备注')
+  await page.keyboard.press('Shift+Tab')
+  await expect(last.getByRole('switch', { name: '启用状态' })).toBeFocused()
+  await expect(page.locator('.app-tab-dirty')).toHaveCount(1)
+
+  await btn(page, '取消').click()
+  await expect(box(page)).toContainText('有未保存的改动')
+  await box(page).getByRole('button', { name: '继续编辑' }).click()
+  await expect(rowOf(page, 'GC20')).toBeVisible()
+  await overlayGone(page)
+  await btn(page, '取消').click()
+  await box(page).getByRole('button', { name: '放弃改动' }).click()
+  await expect(name(page)).toHaveText('岗位 (6)')
+  await expect(page.locator('.app-tab-dirty')).toHaveCount(0)
+  await overlayGone(page)
+
+  // 增了行但没填，也没有未保存标记，取消直接退出
+  await add(page)
+  await expect(page.locator('.app-tab-dirty')).toHaveCount(0)
+  await btn(page, '取消').click()
+  await expect(name(page)).toHaveText('岗位 (6)')
+  await expect(page.locator('.el-message-box').filter({ visible: true })).toHaveCount(0)
+  // 修改但没改，取消直接退出，节点不变
+  await btn(page, '修改').click()
+  await expect(editor(page)).toBeFocused()
+  await btn(page, '取消').click()
+  await expect(btn(page, '增行')).toHaveClass(/el-button--primary/)
+  await expect(page.locator('.el-message-box').filter({ visible: true })).toHaveCount(0)
+  await expect(page).toHaveURL(/category=GC/)
 })
 
-test('查询失败：不显示条数，保留条件，可重新查询', async ({ page }) => {
-  await login(page, 'admin', '/project/roles?org=O1')
-  await expect(page.locator('.el-pagination__total')).toContainText('69')
+test('校验：必填、格式、服务端错误都落到格子，摘要能跳，改了就消', async ({ page }) => {
+  const requests = saves(page)
+  await open(page)
+  await add(page)
+  await btn(page, '保存').click()
+  await expect(problems(page)).toContainText('有 2 处要改')
+  await expect(problems(page)).toContainText('第 7 行·岗位编码：岗位编码不能为空')
+  await expect(editor(page)).toHaveAttribute('aria-label', '岗位编码')
+  await expect(editor(page)).toBeFocused()
+  expect(requests).toHaveLength(0)
+  await page.keyboard.type('岗 位')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('又一个经理')
+  await page.keyboard.press('Enter')
+  await btn(page, '保存').click()
+  await expect(problems(page)).toContainText('只能用字母、数字、下划线和短横线')
+  await expect(editor(page)).toHaveValue('岗 位')
+  await expect(editor(page)).toBeFocused()
+  await page.keyboard.press('Control+A')
+  await page.keyboard.type('GC03')
+  await page.keyboard.press('Enter')
+  await page.locator('.vxe-body--row[rowid^="new-"]').filter({ visible: true }).locator('.el-switch').first().click()
+  await btn(page, '保存').click()
+  // 服务端的错误按行按格落位；经理唯一的范围待定，前端只显示接口返回的
+  await expect(problems(page)).toContainText('第 7 行·岗位编码：岗位编码已被“造价工程师”使用')
+  await expect(problems(page)).toContainText('第 7 行·是否项目经理：已有启用的项目经理岗位“GC01 项目经理”')
+  await expect(page.locator('.app-cell-error').filter({ visible: true })).toHaveCount(2)
+  await expect(editor(page)).toHaveAttribute('aria-label', '岗位编码')
+  // 点摘要跳过去
+  await page.mouse.click(700, 650)
+  await problems(page).getByRole('button', { name: /岗位编码/ }).click()
+  await expect(editor(page)).toHaveValue('GC03')
+  await expect(editor(page)).toBeFocused()
+  await page.keyboard.press('Control+A')
+  await page.keyboard.type('GC20')
+  await page.keyboard.press('Enter')
+  await expect(problems(page)).toContainText('有 1 处要改')
+  await page.locator('.vxe-body--row[rowid^="new-"]').filter({ visible: true }).locator('.el-switch').first().click()
+  await expect(problems(page)).toHaveCount(0)
+  await btn(page, '保存').click()
+  await toastText(page, '已保存')
+  await expect(rowOf(page, 'GC20')).toBeVisible()
+})
+
+test('整表保存：增、改、删一次提交，连点只发一次，没改动不发', async ({ page }) => {
+  const requests = saves(page)
+  await open(page)
+  await btn(page, '修改').click()
+  await expect(editor(page)).toBeFocused()
+  await btn(page, '保存').click()
+  await expect(btn(page, '增行')).toHaveClass(/el-button--primary/)
+  expect(requests).toHaveLength(0)
+
+  await (await actionOf(page, 'GC03', 'edit')).click()
+  await expect(editor(page)).toHaveValue('GC03')
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Control+A')
+  await page.keyboard.type('成本工程师')
+  await btn(page, '增行').click()
+  await expect(editor(page)).toHaveValue('')
+  await page.keyboard.type('GC21')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('测量员')
+  await btn(page, '增行').click()
+  await expect(editor(page)).toHaveValue('')
+  await page.keyboard.type('GC22')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('机械员')
+  await page.keyboard.press('Enter')
+  await (await actionOf(page, 'GC06', 'remove')).click()
+  await expect(rowOf(page, 'GC06')).toHaveCount(0)
+  await expect(await actionOf(page, 'GC01', 'remove')).toBeDisabled()
+  await btn(page, '保存').dblclick()
+  await toastText(page, '已保存')
+  await expect(name(page)).toHaveText('岗位 (7)')
+  await expect(rowOf(page, '成本工程师')).toBeVisible()
+  expect(requests).toHaveLength(1)
+  const body = requests[0]!.postDataJSON() as { created: unknown[]; updated: { id: string }[]; removed: { id: string }[] }
+  expect(body.created).toHaveLength(2)
+  expect(body.updated.map((r) => r.id)).toEqual(['R5'])
+  expect(body.removed.map((r) => r.id)).toEqual(['R8'])
+})
+
+test('保存失败：草稿还在，重试沿用同一个幂等标识，下一次换新的', async ({ page }) => {
+  const requests = saves(page)
+  await open(page)
+  await add(page)
+  await page.keyboard.type('GC23')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('试验员')
+  await page.keyboard.press('Enter')
+  await call(page, '/api/__mock/fail-save')
+  await btn(page, '保存').click()
+  await expect(box(page)).toContainText('没有保存成功')
+  await box(page).getByRole('button', { name: '知道了' }).click()
+  await overlayGone(page)
+  await expect(rowOf(page, 'GC23')).toBeVisible()
+  await expect(btn(page, '保存')).toBeVisible()
+  await btn(page, '保存').click()
+  await toastText(page, '已保存')
+  await overlayGone(page)
+  await add(page)
+  await page.keyboard.type('GC24')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('取样员')
+  await btn(page, '保存').click()
+  await expect(rowOf(page, 'GC24')).toBeVisible()
+  const keys = requests.map((r) => r.headers()['idempotency-key'])
+  expect(keys).toHaveLength(3)
+  expect(keys[0]).toBe(keys[1])
+  expect(keys[2]).not.toBe(keys[0])
+})
+
+test('版本冲突：逐行并列两边的值，直接关掉不算选择，保留我的或改用最新', async ({ page }) => {
+  await open(page)
+  const rename = async (code: string, text: string) => {
+    await (await actionOf(page, code, 'edit')).click()
+    await expect(editor(page)).toHaveValue(code)
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Control+A')
+    await page.keyboard.type(text)
+    await page.keyboard.press('Enter')
+  }
+  await rename('GC03', '我改的名字')
+  await call(page, '/api/__mock/roles/R5/touch')
+  await btn(page, '保存').click()
+  const c = dialog(page, '数据已被他人修改')
+  await expect(c).toContainText('示例同事')
+  await expect(c).toContainText('GC03 我改的名字')
+  await expect(c).toContainText('你的值：我改的名字')
+  await expect(c).toContainText('最新值：造价工程师（他人改）')
+  // 直接关掉对比框不算选择：再保存还要再提示，不能悄悄盖掉别人的修改
+  await c.locator('.el-dialog__headerbtn').click()
+  await overlayGone(page)
+  await btn(page, '保存').click()
+  await c.getByRole('button', { name: '保留我的值，重新保存' }).click()
+  await toastText(page, '已保存')
+  await expect(rowOf(page, '我改的名字')).toBeVisible()
+  await overlayGone(page)
+
+  await rename('GC04', '再改一次')
+  await call(page, '/api/__mock/roles/R6/touch')
+  await btn(page, '保存').click()
+  await c.getByRole('button', { name: '改用最新值' }).click()
+  await overlayGone(page)
+  await expect(rowOf(page, '安全员（他人改）')).toBeVisible()
+  await expect(btn(page, '保存')).toBeVisible()
+  await btn(page, '取消').click()
+  await expect(btn(page, '增行')).toHaveClass(/el-button--primary/)
+  await overlayGone(page)
+
+  // 别人删掉的行：说明白，其余照存
+  await rename('GC05', '施工队长')
+  await (await actionOf(page, 'GC06', 'remove')).click()
+  await call(page, '/api/__mock/roles/R7/remove')
+  await btn(page, '保存').click()
+  await expect(c).toContainText('这一行已被别人删除，不会再保存')
+  await c.getByRole('button', { name: '保留我的值，重新保存' }).click()
+  await expect(name(page)).toHaveText('岗位 (4)')
+})
+
+test('删除：引用保护、临时被引用可改停用、多选部分失败逐行写明', async ({ page }) => {
+  await open(page)
+  const blocked = await moreOf(page, 'GC01', 'delete')
+  await expect(blocked).toContainText('已被 3 个项目引用，不能删除，可以停用')
+  await blocked.click()
+  await expect(box(page)).toContainText('不能删除 GC01 项目经理')
+  await box(page).getByRole('button', { name: '取消' }).click()
+
+  // 打开列表之后才被别人引用：给出引用明细，可以改为停用
+  await call(page, '/api/__mock/roles/R5/reference')
+  await (await moreOf(page, 'GC03', 'delete')).click()
+  await box(page).getByRole('button', { name: '删除' }).click()
+  await expect(box(page)).toContainText('XM2026099 示例项目九十九')
+  await box(page).getByRole('button', { name: '改为停用' }).click()
+  await toastText(page, '已停用')
+  await expect(name(page)).toHaveText('岗位 (5)')
+
+  await overlayGone(page)
+  const checks = page.locator('.vxe-body--row .vxe-cell--checkbox').filter({ visible: true })
+  await checks.nth(0).click()
+  await checks.nth(4).click()
+  await expect(page.getByText('已选 2 条')).toBeVisible()
+  await btn(page, '删除').click()
+  await box(page).getByRole('button', { name: '不删' }).click()
+  await overlayGone(page)
+  await btn(page, '删除').click()
+  await expect(box(page)).toContainText('删除选中的 2 个岗位')
+  await box(page).getByRole('button', { name: '删除' }).click()
+  await expect(box(page)).toContainText('1 个已删除，1 个没删')
+  await expect(box(page)).toContainText('GC01 项目经理：已被 3 个项目引用')
+  await box(page).getByRole('button', { name: '知道了' }).click()
+  await expect(name(page)).toHaveText('岗位 (4)')
+  await expect(page.getByText('已选 0 条')).toBeVisible()
+})
+
+test('停用与启用：停用后默认不列，显示停用才看得到', async ({ page }) => {
+  await open(page)
+  await (await actionOf(page, 'GC05', 'disable')).click()
+  await box(page).getByRole('button', { name: '停用' }).click()
+  await toastText(page, '已停用')
+  await expect(name(page)).toHaveText('岗位 (5)')
+  await overlayGone(page)
+  await page.locator('.el-checkbox', { hasText: '显示停用岗位' }).click()
+  await expect(rowOf(page, 'GC05')).toContainText('已停用')
+  await (await actionOf(page, 'GC05', 'enable')).click()
+  await toastText(page, '已启用')
+  await expect(rowOf(page, 'GC05')).toContainText('已启用')
+})
+
+test('未保存时切分类：先问，不放弃就留在原分类', async ({ page }) => {
+  await open(page)
+  await add(page)
+  await page.keyboard.type('GC25')
+  await page.keyboard.press('Enter')
+  await category(page, 'TZ 投资类').click()
+  await expect(box(page)).toContainText('有未保存的改动')
+  await box(page).getByRole('button', { name: '继续编辑' }).click()
+  await expect(page).toHaveURL(/category=GC/)
+  await expect(page.locator('.role-tree .is-current > .el-tree-node__content')).toContainText('GC 工程类')
+  await expect(rowOf(page, 'GC25')).toBeVisible()
+  await overlayGone(page)
+  await category(page, 'TZ 投资类').click()
+  await box(page).getByRole('button', { name: '放弃改动' }).click()
+  await expect(page).toHaveURL(/category=TZ/)
+  await expect(name(page)).toHaveText('岗位 (2)')
+})
+
+test('查阅员：只读，写明原因', async ({ page }) => {
+  await open(page, 'viewer')
+  await expect(page.locator('.app-detail-reason')).toHaveText('没有“项目岗位-维护”权限')
+  await expect(btn(page, '增行')).toHaveCount(0)
+  await expect(await actionOf(page, 'GC03', 'edit')).toBeDisabled()
+  await (await actionOf(page, 'GC03', 'edit')).locator('xpath=..').hover()
+  await expect(page.locator('.el-popper', { hasText: '没有“项目岗位-维护”权限' }).filter({ visible: true }).first()).toBeVisible()
+  // 没有替代动作时只说明原因
+  await (await moreOf(page, 'GC03', 'delete')).click()
+  await expect(box(page)).toContainText('没有“项目岗位-维护”权限')
+  await box(page).getByRole('button', { name: '知道了' }).click()
+})
+
+test('查询失败：有旧数据就留着并提示，没有就给重新查询', async ({ page }) => {
+  await open(page)
   await call(page, '/api/__mock/fail-list')
-  await page.locator('input[name="keyword"]').fill('项目')
-  await page.locator('input[name="keyword"]').press('Enter')
-  await expect(page.getByText('查询失败').filter({ visible: true })).toHaveCount(1)
-  await expect(page.locator('.el-pagination__total')).toHaveCount(0)
-  await expect(page.locator('.app-query-tabs').getByRole('tab', { name: '全部' })).toHaveText('全部')
-  await expect(page.locator('input[name="keyword"]')).toHaveValue('项目')
+  await page.getByRole('button', { name: '刷新' }).click()
+  await expect(page.locator('.el-alert')).toContainText('服务器出错')
+  await expect(rowOf(page, 'GC01')).toBeVisible()
+  await page.locator('.el-alert').getByRole('button', { name: '重新查询' }).click()
+  await expect(page.locator('.el-alert')).toHaveCount(0)
+  await call(page, '/api/__mock/fail-list')
+  await category(page, 'TZ 投资类').click()
+  await expect(seen(page, '查询失败')).toHaveCount(1)
   await page.getByRole('button', { name: '重新查询' }).filter({ visible: true }).click()
-  await expect(rowOf(page, '项目经理')).toBeVisible()
+  await expect(name(page)).toHaveText('岗位 (2)')
 })
 
-test('行高：切换后立即生效，刷新还在', async ({ page }) => {
-  await login(page, 'admin', '/project/roles?org=O1')
-  await expect(rowOf(page, '项目经理')).toBeVisible()
-  const height = () => rowOf(page, '项目经理').evaluate((el) => el.getBoundingClientRect().height)
-  await page.getByRole('button', { name: '视图' }).click()
-  await page.getByRole('menuitem', { name: '行高 紧凑' }).click()
-  await expect.poll(height).toBe(32)
-  await page.reload()
-  await expect(rowOf(page, '项目经理')).toBeVisible()
-  expect(await height()).toBe(32)
-})
-
-test('返回页签：条件和滚动位置都在', async ({ page }) => {
-  await login(page, 'admin', '/project/roles?org=O1')
-  await expect(rowOf(page, '项目经理')).toBeVisible()
+test('长表：返回页签时滚动位置还在；列设置能看到隐藏的列', async ({ page }) => {
+  await login(page, 'admin', `${PATH}?org=G&category=XX`)
+  await expect(name(page)).toHaveText('岗位 (60)')
+  await overlayGone(page)
   const body = page.locator('.vxe-table--main-wrapper .vxe-table--body-inner-wrapper')
   await body.hover()
-  await page.mouse.wheel(0, 900)
-  await expect.poll(() => rowOf(page, 'GW0001').count()).toBe(0)
+  await page.mouse.wheel(0, 700)
   const firstRow = () => page.locator('.vxe-body--row').filter({ visible: true }).first().getAttribute('rowid')
+  await expect.poll(firstRow).not.toBe('R100')
   await page.waitForTimeout(300)
   const before = await firstRow()
   await page.locator('[data-tab="/home"]').click()
   await expect(page.getByText('你好')).toBeVisible()
   await page.locator('[data-tab="/project/roles"]').click()
   await expect.poll(firstRow).toBe(before)
-})
 
-test('保存并继续新增：清空表单、焦点回到第一格，校验失败聚焦首个错误', async ({ page }) => {
-  await login(page, 'admin', '/project/roles?org=O1')
-  await page.getByRole('button', { name: '新增岗位' }).click()
-  const d = dialog(page, '新增岗位')
-  const code = d.locator('input[name="code"]')
-  await d.locator('input[name="name"]').fill('连续一')
-  await d.getByRole('button', { name: '保存', exact: true }).click()
-  await expect(code).toBeFocused()
-  await code.fill('GW9101')
-  await d.getByRole('button', { name: '保存并继续新增' }).click()
-  await toastText(page, '已新增')
-  await expect(code).toHaveValue('')
-  await expect(code).toBeFocused()
-  await expect(d.locator('.is-error')).toHaveCount(0)
-  // 没填过直接关，不问
-  await d.getByRole('button', { name: '取消' }).click()
-  await expect(d).toBeHidden()
-  await expect(rowOf(page, 'GW9101')).toBeVisible()
-})
-
-test('新增：必填、编码重复、经理唯一、连点只提交一次', async ({ page }) => {
-  await login(page, 'admin')
-  await org(page, '华东公司')
-  await expect(rowOf(page, '项目经理')).toBeVisible()
-  await page.getByRole('button', { name: '新增岗位' }).click()
-  const d = dialog(page, '新增岗位')
-  await d.getByRole('button', { name: '保存', exact: true }).click()
-  await expect(d.getByText('请填写岗位编码')).toBeVisible()
-  await expect(d.getByText('请填写岗位名称')).toBeVisible()
-
-  await d.locator('input[name="code"]').fill('GW0003')
-  await d.locator('input[name="name"]').fill('测试岗位')
-  await d.locator('.el-switch').click()
-  await d.getByRole('button', { name: '保存', exact: true }).click()
-  await expect(d.getByText('岗位编码已被“项目经理”使用')).toBeVisible()
-  await expect(d.getByText('华东公司已有经理岗位“项目经理”，每个组织只能有一个')).toBeVisible()
-  await expect(page.locator('.app-tab-dirty')).toHaveCount(1)
-
-  await d.locator('input[name="code"]').fill('GW9001')
-  await d.locator('.el-switch').click()
-  let posts = 0
-  page.on('request', (r) => {
-    if (r.method() === 'POST' && r.url().endsWith('/api/project-roles')) posts++
-  })
-  await d.getByRole('button', { name: '保存', exact: true }).dblclick()
-  await toastText(page, '已新增')
-  await expect(rowOf(page, 'GW9001')).toBeVisible()
-  expect(posts).toBe(1)
-  await expect(page.locator('.app-tab-dirty')).toHaveCount(0)
-})
-
-test('编辑与并发冲突：并列显示两边的值，可保留我的或改用最新', async ({ page }) => {
-  await login(page, 'admin')
-  await org(page, '华东公司')
-  await (await actionOf(page, 'GW0004', 'edit')).click()
-  const d = dialog(page, '编辑岗位 GW0004')
-  await d.locator('input[name="name"]').fill('我改的名字')
-  expect(await call(page, '/api/__mock/roles/R4/touch')).toBe(200)
-  await d.getByRole('button', { name: '保存', exact: true }).click()
-  const c = dialog(page, '数据已被他人修改')
-  await expect(c).toContainText('示例同事')
-  await expect(c).toContainText('你的值：我改的名字')
-  await expect(c).toContainText('最新值：项目副经理（他人改）')
-  await c.getByRole('button', { name: '保留我的值，重新保存' }).click()
-  await toastText(page, '已保存')
-  await expect(rowOf(page, '我改的名字')).toBeVisible()
-
-  await (await actionOf(page, 'GW0004', 'edit')).click()
-  await d.locator('input[name="name"]').fill('再改一次')
-  await call(page, '/api/__mock/roles/R4/touch')
-  await d.getByRole('button', { name: '保存', exact: true }).click()
-  // 直接关掉对比框不算选择：再保存还要再提示，不能悄悄盖掉别人的修改
-  await c.locator('.el-dialog__headerbtn').click()
-  await expect(c).toBeHidden()
-  await d.getByRole('button', { name: '保存', exact: true }).click()
-  await expect(c).toBeVisible()
-  await c.getByRole('button', { name: '改用最新值' }).click()
-  await expect(d.locator('input[name="name"]')).toHaveValue('我改的名字（他人改）')
-  await d.getByRole('button', { name: '保存', exact: true }).click()
-  await toastText(page, '已保存')
-})
-
-test('删除：引用保护、临时被引用、正常删除；停用与启用', async ({ page }) => {
-  await login(page, 'admin')
-  await org(page, '华东公司')
-  const blocked = await moreOf(page, 'GW0003', 'delete')
-  await expect(blocked).toContainText('已被 3 个项目引用，不能删除，可以停用')
-  await blocked.click()
-  await expect(box(page)).toContainText('不能删除 GW0003')
-  await expect(box(page).getByRole('button', { name: '改为停用' })).toBeVisible()
-  await box(page).getByRole('button', { name: '取消' }).click()
-
-  // 打开列表之后才被别人引用：给出引用明细，可以改为停用
-  await call(page, '/api/__mock/roles/R100/reference')
-  await (await moreOf(page, 'GW0100', 'delete')).click()
-  await box(page).getByRole('button', { name: '删除' }).click()
-  await expect(box(page)).toContainText('XM2026099 示例项目九十九')
-  await box(page).getByRole('button', { name: '改为停用' }).click()
-  await toastText(page, '已停用')
-  await expect(await mainRow(page, 'GW0100')).toContainText('已停用')
-
-  await (await moreOf(page, 'GW0101', 'delete')).click()
-  await box(page).getByRole('button', { name: '取消' }).click()
-  await expect(rowOf(page, 'GW0101')).toBeVisible()
-  await (await moreOf(page, 'GW0101', 'delete')).click()
-  await box(page).getByRole('button', { name: '删除' }).click()
-  await toastText(page, '已删除')
-  await expect(page.locator('.vxe-body--row', { hasText: 'GW0101' }).filter({ visible: true })).toHaveCount(0)
-
-  await (await actionOf(page, 'GW0102', 'disable')).click()
-  await box(page).getByRole('button', { name: '停用' }).click()
-  await expect(await mainRow(page, 'GW0102')).toContainText('已停用')
-  await (await actionOf(page, 'GW0102', 'enable')).click()
-  await toastText(page, '已启用')
-})
-
-test('权限：查阅员只读并说明原因；无权用户看不到菜单、进 403 写明缺什么', async ({ page }) => {
-  await login(page, 'viewer')
-  await expect(rowOf(page, '集团项目总监')).toBeVisible()
-  await expect(page.getByRole('button', { name: '新增岗位' })).toHaveCount(0)
-  await expect(await actionOf(page, '集团项目总监', 'edit')).toBeDisabled()
-  await (await actionOf(page, '集团项目总监', 'edit')).locator('xpath=..').hover()
-  // “更多”里的原因文字已在页面上但没显示，只看看得见的
-  await expect(page.getByText('没有“项目岗位-维护”权限').filter({ visible: true }).first()).toBeVisible()
-  // 没有替代动作时只说明原因
-  await (await moreOf(page, '集团项目总监', 'delete')).click()
-  await expect(box(page)).toContainText('没有“项目岗位-维护”权限')
-  await box(page).getByRole('button', { name: '知道了' }).click()
-
-  await page.getByRole('button', { name: '示例查阅员' }).click()
-  await page.getByRole('menuitem', { name: '退出登录' }).click()
-  await expect(page).toHaveURL(/\/login/)
-  await login(page, 'nobody')
-  await expect(page.getByText('没有权限')).toBeVisible()
-  await expect(page.getByText('项目岗位-查看（project:role:view）')).toBeVisible()
-  await expect(page.locator('.el-menu', { hasText: '项目岗位' })).toHaveCount(0)
-})
-
-test('集团岗位在下级组织只读', async ({ page }) => {
-  await login(page, 'admin', '/project/roles?org=O2')
-  await expect(await actionOf(page, '集团合约专员', 'edit')).toBeDisabled()
-  await expect(await actionOf(page, 'GW0006', 'edit')).toBeEnabled()
-})
-
-test('未保存：关页签要确认，取消则保留', async ({ page }) => {
-  await login(page, 'admin')
-  await page.getByRole('button', { name: '新增岗位' }).click()
-  const d = dialog(page, '新增岗位')
-  await d.locator('input[name="code"]').fill('X1')
-  await d.getByRole('button', { name: '取消' }).click()
-  await box(page).getByRole('button', { name: '继续填写' }).click()
-  await expect(d.locator('input[name="code"]')).toHaveValue('X1')
-  await d.getByRole('button', { name: '取消' }).click()
-  await page.locator('.el-message-box').getByRole('button', { name: '放弃修改' }).click()
-  await expect(d).toBeHidden()
-  await expect(page.locator('.app-tab-dirty')).toHaveCount(0)
-})
-
-test('会话失效：回到登录页并带上原地址', async ({ page }) => {
-  await login(page, 'admin', '/project/roles?org=O1')
-  await expect(rowOf(page, '项目经理')).toBeVisible()
-  await call(page, '/api/__mock/expire')
-  await org(page, '华南公司')
-  await expect(page).toHaveURL(/\/login\?redirect=/)
-})
-
-test('动效：对话框从点击处展开，系统减少动态效果时近乎关闭', async ({ page }) => {
-  await login(page, 'admin')
-  await expect(rowOf(page, '集团项目总监')).toBeVisible()
-  const button = page.getByRole('button', { name: '新增岗位' })
-  const rect = (await button.boundingBox())!
-  await button.click()
-  await page.waitForTimeout(30)
-  const info = await page.evaluate(() => {
-    const overlay = document.querySelector<HTMLElement>('.el-modal-dialog .el-overlay-dialog, .el-overlay .el-overlay-dialog')!
-    const host = overlay.closest<HTMLElement>('.el-overlay')!
-    return {
-      motion: document.documentElement.classList.contains('app-motion'),
-      origin: host.style.getPropertyValue('--app-origin'),
-      names: document.getAnimations().map((a) => (a as CSSAnimation).animationName).filter(Boolean),
-    }
-  })
-  expect(info.motion).toBe(true)
-  const [x, y] = info.origin.split(' ').map((v) => Number.parseFloat(v))
-  expect(Math.abs(x! - (rect.x + rect.width / 2))).toBeLessThan(3)
-  expect(Math.abs(y! - (rect.y + rect.height / 2))).toBeLessThan(3)
-  expect(info.names).toContain('app-zoom-in')
-
-  await page.emulateMedia({ reducedMotion: 'reduce' })
-  const scale = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--app-motion-scale').trim())
-  expect(Number(scale)).toBe(0.01)
-})
-
-test('布局：顶栏 48、侧栏 216 可折叠到 64、表格行高 36、表头底色', async ({ page }) => {
-  await login(page, 'admin')
-  await expect(rowOf(page, '集团项目总监')).toBeVisible()
-  const size = (s: string, k: 'height' | 'width') =>
-    page.locator(s).first().evaluate((el, key) => el.getBoundingClientRect()[key], k)
-  expect(await size('.app-header', 'height')).toBe(48)
-  expect(await size('.app-aside', 'width')).toBe(216)
-  expect(await size('.vxe-body--row', 'height')).toBe(36)
-  const header = await page.locator('.vxe-header--column').first().evaluate((el) => getComputedStyle(el).backgroundColor)
-  expect(['rgb(240, 243, 247)', 'rgba(0, 0, 0, 0)']).toContain(header)
-  await page.getByRole('button', { name: '收起菜单' }).click()
-  expect(await size('.app-aside', 'width')).toBe(64)
-  await page.screenshot({ path: 'test-results/layout-collapsed.png' })
-  await page.getByRole('button', { name: '展开菜单' }).click()
-  await expect(page.locator('.app-aside .el-menu-item', { hasText: '项目岗位' })).toBeVisible()
-  await expect(page.locator('.el-tabs__item').first()).toContainText('工作台')
-  await page.waitForTimeout(400)
-  await page.screenshot({ path: 'test-results/layout.png' })
+  await overlayGone(page)
+  await page.getByRole('button', { name: '表格设置' }).filter({ visible: true }).click()
+  await page.locator('.app-cols .is-one button', { hasText: '最后修改人' }).click()
+  await page.locator('.app-cols').getByRole('button', { name: '保存' }).click()
+  await expect(page.locator('.vxe-header--column', { hasText: '最后修改人' }).filter({ visible: true })).toHaveCount(1)
+  await overlayGone(page)
+  // 加了列要横滚：左右固定列得跟着主体的滚动位置，不能空白
+  const aligned = () =>
+    page.evaluate(() => {
+      const y = (sel: string) => {
+        const box = document.querySelector(sel)?.getBoundingClientRect()
+        const row = box && [...document.querySelectorAll<HTMLElement>(`${sel} tr[rowid]`)].find((r) => r.getBoundingClientRect().y >= box.y)
+        return row ? `${row.getAttribute('rowid')}@${Math.round(row.getBoundingClientRect().y)}` : 'none'
+      }
+      return [y('.vxe-table--main-wrapper .vxe-table--body-wrapper'), y('.vxe-table--fixed-left-wrapper .vxe-table--body-wrapper'), y('.vxe-table--fixed-right-wrapper .vxe-table--body-wrapper')]
+    })
+  await expect.poll(async () => new Set(await aligned()).size).toBe(1)
+  expect((await aligned())[0]).not.toBe('none')
+  // 变宽再变窄也一样
+  await page.setViewportSize({ width: 1800, height: 768 })
+  await page.waitForTimeout(300)
+  await page.setViewportSize({ width: 1366, height: 768 })
+  await expect.poll(async () => new Set(await aligned()).size).toBe(1)
+  expect((await aligned())[0]).not.toBe('none')
 })

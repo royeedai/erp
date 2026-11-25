@@ -8,11 +8,14 @@
  *
  * OpenAPI spec version: 0.1.0
  */
-import type { ProjectRole } from './projectRole';
-import type { ProjectRoleCounts } from './projectRoleCounts';
+import type { ProjectRoleCreateRow } from './projectRoleCreateRow';
+import type { ProjectRoleUpdateRow } from './projectRoleUpdateRow';
+import type { RowVersion } from './rowVersion';
 
-export interface ProjectRolePage {
-  list: ProjectRole[];
-  total: number;
-  counts: ProjectRoleCounts;
+export interface ProjectRoleSave {
+  orgId: string;
+  categoryId: string;
+  created: ProjectRoleCreateRow[];
+  updated: ProjectRoleUpdateRow[];
+  removed: RowVersion[];
 }

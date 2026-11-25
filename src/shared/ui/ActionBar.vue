@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 行内动作：能不能点、为什么不能点，全看接口返回的 allowedActions。最多平铺 2 个，其余进“更多”。
-// 一页几十行都有它：提示只给不可用的动作挂，“更多”的菜单点了才挂，否则首屏渲染会慢一截。
-import { computed, nextTick, ref, useTemplateRef } from 'vue'
+// 一页几十行都有它：提示悬停时才挂，“更多”的菜单点了才挂，否则首屏渲染会慢一截。
+import { computed, nextTick, ref, shallowRef, useTemplateRef } from 'vue'
 import type { DropdownInstance } from 'element-plus'
 
 export interface ActionItem {
@@ -32,6 +32,13 @@ const shown = computed(() =>
 const inline = computed(() => shown.value.slice(0, MAX_INLINE))
 const more = computed(() => shown.value.slice(MAX_INLINE))
 
+const hovered = ref('')
+const hoverTarget = shallowRef<HTMLElement>()
+function onHover(action: string, e: MouseEvent) {
+  hoverTarget.value = e.currentTarget as HTMLElement
+  hovered.value = action
+}
+
 const menuMounted = ref(false)
 const menuRef = useTemplateRef<DropdownInstance>('menuRef')
 const rootRef = useTemplateRef<HTMLElement>('rootRef')
@@ -58,20 +65,20 @@ function pick(action: string) {
       <el-button
         v-if="a.allowed"
         link
-        :type="a.danger ? 'danger' : 'primary'"
         :data-action="a.action"
         @click="emit('run', a.action)"
       >
         {{ a.label }}
       </el-button>
-      <el-tooltip v-else :content="a.reason" placement="top">
-        <!-- 禁用按钮不触发鼠标事件，套一层才能显示原因 -->
-        <span><el-button link disabled :data-action="a.action">{{ a.label }}</el-button></span>
-      </el-tooltip>
+      <!-- 禁用按钮不触发鼠标事件，套一层才能显示原因；提示悬停时才挂 -->
+      <span v-else class="app-action-off" @mouseenter="onHover(a.action, $event)" @mouseleave="hovered = ''">
+        <el-button link disabled :data-action="a.action">{{ a.label }}</el-button>
+        <el-tooltip v-if="hovered === a.action" :visible="true" :virtual-ref="hoverTarget" virtual-triggering :content="a.reason" placement="top" />
+      </span>
     </template>
     <template v-if="more.length > 0">
       <el-dropdown v-if="menuMounted" ref="menuRef" trigger="click" @command="pick">
-        <el-button link type="primary" data-action="more">更多</el-button>
+        <el-button link data-action="more">更多</el-button>
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item
@@ -87,7 +94,7 @@ function pick(action: string) {
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-      <el-button v-else link type="primary" data-action="more" aria-haspopup="menu" @click="openMenu">更多</el-button>
+      <el-button v-else link data-action="more" aria-haspopup="menu" @click="openMenu">更多</el-button>
     </template>
   </span>
 </template>
@@ -100,6 +107,9 @@ function pick(action: string) {
 }
 .app-action-bar .el-button {
   padding: 0;
+}
+.app-action-off {
+  display: inline-flex;
 }
 .app-action-bar .el-button + .el-button {
   margin-left: 0;

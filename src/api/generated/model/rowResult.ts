@@ -9,11 +9,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-/**
- * 当前组织和关键字下各状态的条数，不受 enabled 条件影响
- */
-export interface ProjectRoleCounts {
-  all: number;
-  enabled: number;
-  disabled: number;
+export interface RowResult {
+  id: string;
+  /** 这一行怎么称呼，例如“GC01 项目经理” */
+  title: string;
+  ok: boolean;
+  /** 没成功的原因 */
+  message?: string;
+  references?: string[];
 }

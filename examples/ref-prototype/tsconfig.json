@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.app.json",
+  "include": ["./**/*.ts", "./**/*.vue", "../../src/env.d.ts"],
+  "exclude": ["./vite.config.ts"],
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "tsBuildInfoFile": null,
+    "paths": { "@/*": ["../../src/*"] }
+  }
+}

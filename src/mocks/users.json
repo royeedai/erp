@@ -5,8 +5,7 @@
     "password": "mock-admin",
     "name": "示例管理员",
     "permissions": [
-      "project:role:view",
-      "project:role:create"
+      "project:role:view"
     ],
     "canMaintainRole": true
   },

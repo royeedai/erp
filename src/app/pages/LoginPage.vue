@@ -42,7 +42,7 @@ async function submit() {
 <template>
   <div class="login">
     <el-form ref="formRef" class="login-card" :model="form" :rules="rules" label-position="top" @submit.prevent="submit">
-      <h1 class="app-page-title">ERP 前端基座</h1>
+      <h1>ERP 前端基座</h1>
       <el-form-item label="账号" prop="username">
         <el-input v-model="form.username" name="username" autocomplete="username" />
       </el-form-item>
@@ -67,10 +67,20 @@ async function submit() {
   padding: var(--app-space-6);
   background: var(--app-bg-container);
   border: 1px solid var(--app-divider);
-  border-radius: var(--app-radius-panel);
+  border-radius: var(--app-radius-card);
+  --el-component-size: 32px;
 }
-.login-card .app-page-title {
-  margin-bottom: var(--app-space-4);
+.login-card h1 {
+  margin: 0 0 var(--app-space-4);
+  font-size: var(--app-font-page);
+  line-height: 24px;
+}
+.login-card .el-input__wrapper {
+  height: 32px;
+  box-sizing: border-box;
+}
+.login-card .el-button {
+  height: 32px;
 }
 .login-error {
   margin-bottom: var(--app-space-3);

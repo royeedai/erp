@@ -9,11 +9,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface ProjectRoleCreate {
-  orgId: string;
-  code: string;
-  name: string;
-  isManager: boolean;
-  /** @nullable */
-  remark?: string | null;
+export interface HomeDraft {
+  id: string;
+  no: string;
+  /** 往来单位 */
+  party: string;
+  amount: string;
+  date: string;
 }

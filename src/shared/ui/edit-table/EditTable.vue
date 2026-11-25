@@ -1,8 +1,13 @@
 <script setup lang="ts" generic="Row extends EditRow">
-// 可编辑明细：vxe-table（免费版）+ EditCell。键盘规则自己定，不依赖企业版的区域功能。
-import { computed, nextTick, provide, useTemplateRef } from 'vue'
+// 可编辑表：vxe-table（免费版）+ EditCell。单据明细和表内编辑共用；键盘规则自己定，不依赖企业版的区域功能。
+import { computed, inject, nextTick, provide, ref, useTemplateRef, watch } from 'vue'
+import { Setting } from '@element-plus/icons-vue'
 import { VxeColumn, VxeTable, type VxeTableInstance, type VxeTablePropTypes } from 'vxe-table'
 import { formatAmount, isNegative, sumAmounts } from '@/shared/money/amount'
+import ColumnSettings from '../ColumnSettings.vue'
+import { CHECK_WIDTH, DEFAULT_DENSITY, densityKey, SEQ_WIDTH, type Density } from '../columns'
+import { useScrollSync } from '../useScrollSync'
+import { useShownColumns } from '../useShownColumns'
 import EditCell from './EditCell.vue'
 import {
   editTableKey,
@@ -11,6 +16,7 @@ import {
   type EditColumn,
   type EditError,
   type EditRow,
+  type EditValue,
 } from './types'
 
 const props = withDefaults(
@@ -20,13 +26,35 @@ const props = withDefaults(
     height?: number | string
     readonly?: boolean
     totalLabel?: string
+    /** 第一列勾选 */
+    selectable?: boolean
+    /** 操作列宽 */
+    actionsWidth?: number
+    /** 记住列设置用的名字，全局唯一；有操作列时表头最右端是列设置 */
+    tableKey?: string
+    /** 要改的格子：表格上方列出来，点了跳过去 */
+    problems?: EditError[]
+    loading?: boolean
   }>(),
-  { height: 480, readonly: false, totalLabel: '明细合计' },
+  { height: 480, readonly: false, totalLabel: '明细合计', selectable: false, actionsWidth: 140, tableKey: undefined, problems: () => [], loading: false },
 )
 
 const emit = defineEmits<{ change: [change: CellChange<Row>]; 'reach-end': [] }>()
+const selection = defineModel<Row[]>('selection', { default: () => [] })
+const slots = defineSlots<
+  { [K in `cell-${string}`]?: (props: { row: Row }) => unknown } & {
+    /** 操作列 */
+    actions?: (props: { row: Row }) => unknown
+    empty?: () => unknown
+  }
+>()
+
+const density = inject(densityKey, ref<Density>(DEFAULT_DENSITY))
+const settings = ref(false)
+const { shown, shownKeys, defaults, save } = useShownColumns(() => props.columns, () => props.tableKey)
 
 const tableRef = useTemplateRef<VxeTableInstance<Row>>('tableRef')
+const { sync } = useScrollSync(tableRef as never, () => shownKeys.value.join())
 let editor: CellEditor | null = null
 
 provide(editTableKey, {
@@ -39,7 +67,7 @@ provide(editTableKey, {
   write: (row, key, value) => {
     const target = row as Row
     const k = key as Extract<keyof Row, string>
-    const previous = target[k] as string | null
+    const previous = target[k] as EditValue
     ;(target as EditRow)[key] = value
     emit('change', { row: target, key: k, value, previous })
   },
@@ -67,11 +95,45 @@ function isNumeric(column: EditColumn<Row>) {
 }
 
 function display(column: EditColumn<Row>, row: Row): string {
-  const value = row[column.key] as string | null | undefined
+  const raw = row[column.key] as EditValue | undefined
+  if (column.kind === 'switch') return (column.switchText ?? ['是', '否'])[raw ? 0 : 1]
+  const value = raw as string | null | undefined
   if (isNumeric(column)) return formatAmount(value, column.scale ?? 2)
-  if (value === null || value === undefined || value === '') return '—'
+  // 编辑时能填的空格就空着，不写“—”
+  if (value === null || value === undefined || value === '') return canEdit(column, row) ? '' : '—'
   if (column.kind === 'select') return optionLabels.value.get(column.key)?.get(value) ?? value
   return value
+}
+
+function onSwitch(column: EditColumn<Row>, row: Row, value: boolean) {
+  emit('change', { row, key: column.key, value, previous: !value })
+}
+
+/* ---------- 勾选与行样式 ---------- */
+
+function syncSelection() {
+  selection.value = (tableRef.value?.getCheckboxRecords() ?? []) as Row[]
+}
+async function clearSelection() {
+  await tableRef.value?.clearCheckboxRow()
+  syncSelection()
+}
+// 行没了，勾选也跟着没
+watch(
+  () => props.rows.map((r) => r.id).join(),
+  async () => {
+    if (!props.selectable) return
+    await nextTick()
+    syncSelection()
+  },
+)
+
+const problemText = computed(() => new Map(props.problems.map((e) => [`${e.rowId}:${e.key}`, e.message])))
+function cellClass({ row, column }: { row: Row; column: { field: string } }) {
+  const c = columnByKey.value.get(column.field)
+  if (!c) return ''
+  if (problemText.value.has(`${row.id}:${c.key}`)) return 'app-cell-error'
+  return !props.readonly && !canEdit(c, row) ? 'app-cell-readonly' : ''
 }
 
 /* ---------- 合计 ---------- */
@@ -147,14 +209,26 @@ async function activate(row: Row, key: string) {
   if (!table) return
   void table.scrollToRow(row, key)
   await nextTick()
+  // 开关没有编辑态，直接把焦点给它：空格切换，回车到下一格
+  if (columnByKey.value.get(key)?.kind === 'switch') {
+    await table.clearEdit()
+    table.getCellElement(row, key)?.querySelector<HTMLInputElement>('.el-switch__input')?.focus()
+    return
+  }
   // isPos 在 4.24.4 的源码里有（edit/hook.js 的 setEditCell），类型声明漏写；升级 vxe 时要重跑连按测试
   if (table.getCellElement(row, key)) await table.setEditCell(row, key, { isPos: false } as object)
   else await table.setEditCell(row, key)
 }
 
+/** 从表格外面（按钮、错误摘要）跳到一格 */
 async function focusCell(rowId: string, key: string) {
+  // 点表格外的按钮时，vxe 会在这之后才收起正在编辑的格子，马上开新格子会被它清掉焦点：先收完再开
+  await tableRef.value?.clearEdit()
+  await new Promise((resolve) => setTimeout(resolve, 30))
   const row = props.rows.find((r) => r.id === rowId)
-  if (row) await activate(row, key)
+  if (!row) return
+  await tableRef.value?.setCurrentRow(row)
+  await activate(row, key)
 }
 
 /** 当前格之后（或之前）的下一个可编辑格，跨行 */
@@ -176,11 +250,12 @@ function nextEditable(row: Row, key: string, step: 1 | -1): { row: Row; key: str
   return null
 }
 
-async function move(step: 1 | -1) {
+async function move(step: 1 | -1, from?: { row: Row; key: string }) {
   const cell = tableRef.value?.getEditCell()
-  if (!cell) return
+  const at = from ?? (cell ? { row: cell.row as Row, key: cell.column.field } : null)
+  if (!at) return
   editor?.commit()
-  const next = nextEditable(cell.row, cell.column.field, step)
+  const next = nextEditable(at.row, at.key, step)
   if (next) {
     await activate(next.row, next.key)
   } else {
@@ -198,8 +273,25 @@ async function cancel() {
   await tableRef.value?.setSelectCell(cell.row, cell.column)
 }
 
+/** 焦点在哪一行哪一列的开关上 */
+function switchCell(target: EventTarget | null): { row: Row; key: string } | null {
+  const td = target instanceof HTMLElement && target.classList.contains('el-switch__input') ? target.closest('td') : null
+  const tr = td?.closest('tr')
+  const row = tr ? tableRef.value?.getRowNode(tr)?.item : undefined
+  const column = td ? tableRef.value?.getColumnNode(td)?.item : undefined
+  return row && column ? { row: row as Row, key: column.field } : null
+}
+
 function onKeydown(e: KeyboardEvent) {
-  if (e.isComposing || e.altKey || e.ctrlKey || e.metaKey || !editor) return
+  if (e.isComposing || e.altKey || e.ctrlKey || e.metaKey) return
+  const onSwitch = e.key === 'Enter' || e.key === 'Tab' ? switchCell(e.target) : null
+  if (onSwitch) {
+    e.preventDefault()
+    e.stopPropagation()
+    void move(e.shiftKey ? -1 : 1, onSwitch)
+    return
+  }
+  if (!editor) return
   if (e.key === 'Enter' || e.key === 'Tab') {
     if (e.key === 'Enter' && editor.ownsEnter()) return
     e.preventDefault()
@@ -217,6 +309,8 @@ const editConfig: VxeTablePropTypes.EditConfig<Row> = {
   trigger: 'click',
   mode: 'cell',
   showIcon: false,
+  // 星号自己画：浏览时不显示，编辑时才带
+  showAsterisk: false,
   showStatus: false,
   autoClear: true,
   isReuseKeep: false,
@@ -226,58 +320,131 @@ const editConfig: VxeTablePropTypes.EditConfig<Row> = {
   },
 }
 
-defineExpose({ validate, focusCell, totals, commit: () => editor?.commit() })
+defineExpose({ validate, focusCell, totals, clearSelection, commit: () => editor?.commit() })
 </script>
 
 <template>
-  <div class="app-edit-table" @keydown.capture="onKeydown">
-    <VxeTable
-      ref="tableRef"
-      :data="rows"
-      :height="height"
-      border
-      :row-config="{ keyField: 'id', isHover: true }"
-      :cell-config="{ height: 36 }"
-      :edit-config="editConfig"
-      :edit-rules="rules"
-      :valid-config="{ autoPos: false, autoClear: false, msgMode: 'full', showErrorBackground: true }"
-      :mouse-config="{ selected: true }"
-      :keyboard-config="{ isArrow: true, isEdit: true, isEsc: false }"
-      :virtual-y-config="{ enabled: true, gt: 30 }"
-      :virtual-x-config="{ enabled: false }"
-      :show-footer="Object.keys(totals).length > 0"
-      :footer-data="footerData"
-    >
-      <VxeColumn type="seq" field="seq" title="序号" width="64" fixed="left" align="center" />
-      <VxeColumn
-        v-for="c in columns"
-        :key="c.key"
-        :field="c.key"
-        :title="c.label"
-        :width="c.width"
-        :min-width="c.minWidth"
-        :fixed="c.fixed"
-        :align="isNumeric(c) ? 'right' : 'left'"
-        :edit-render="c.editable ? {} : undefined"
-        :class-name="isNumeric(c) ? 'app-num' : undefined"
-        :footer-class-name="isNumeric(c) ? 'app-num' : undefined"
+  <div class="app-edit-table app-grid" :class="{ 'is-editing': !readonly }" :style="{ '--app-row-height': `${density}px` }" @keydown.capture="onKeydown">
+    <div v-if="problems.length > 0" class="app-edit-problems" role="alert">
+      <b>有 {{ problems.length }} 处要改</b>
+      <button v-for="e in problems" :key="`${e.rowId}:${e.key}`" type="button" @click="focusCell(e.rowId, e.key)">
+        第 {{ e.rowNo }} 行·{{ e.label }}：{{ e.message }}
+      </button>
+    </div>
+    <div v-loading="loading" class="app-edit-body">
+      <VxeTable
+        ref="tableRef"
+        :data="rows"
+        :height="height"
+        border
+        :row-config="{ keyField: 'id', isHover: true, isCurrent: true }"
+        :cell-config="{ height: density }"
+        :header-cell-config="{ height: 25 }"
+        :footer-cell-config="{ height: 25 }"
+        :checkbox-config="{ highlight: true }"
+        :cell-class-name="cellClass"
+        :edit-config="editConfig"
+        :edit-rules="rules"
+        :valid-config="{ autoPos: false, autoClear: false, msgMode: 'full', showErrorBackground: true, showMessage: false }"
+        :mouse-config="{ selected: true }"
+        :keyboard-config="{ isArrow: true, isEdit: true, isEsc: false }"
+        :virtual-y-config="{ enabled: true, gt: 30 }"
+        :virtual-x-config="{ enabled: false }"
+        :show-footer="Object.keys(totals).length > 0"
+        :footer-data="footerData"
+        @column-resizable-change="sync"
+        @checkbox-change="syncSelection"
+        @checkbox-all="syncSelection"
       >
-        <template #default="{ row }">
-          <span :class="{ 'is-negative': isNumeric(c) && isNegative(row[c.key]) }">{{ display(c, row) }}</span>
-        </template>
-        <template #edit="{ row }">
-          <EditCell :key="`${row.id}:${c.key}`" :column="c as unknown as EditColumn" :row="row" />
-        </template>
-      </VxeColumn>
-    </VxeTable>
+        <VxeColumn v-if="selectable" type="checkbox" :width="CHECK_WIDTH" align="center" fixed="left" />
+        <VxeColumn type="seq" field="seq" title="序号" :width="SEQ_WIDTH" fixed="left" />
+        <VxeColumn
+          v-for="c in shown"
+          :key="c.key"
+          :field="c.key"
+          :title="c.label"
+          :width="c.width"
+          :min-width="c.minWidth"
+          :fixed="c.fixed"
+          :align="isNumeric(c) ? 'right' : 'left'"
+          :edit-render="c.editable && c.kind !== 'switch' ? {} : undefined"
+          :header-class-name="!readonly && c.editable && c.required ? 'app-col-required' : undefined"
+          :class-name="isNumeric(c) ? 'app-num' : undefined"
+          :footer-class-name="isNumeric(c) ? 'app-num' : undefined"
+        >
+          <template #default="{ row }">
+            <slot :name="`cell-${c.key}`" :row="row">
+              <el-switch
+                v-if="c.kind === 'switch' && canEdit(c, row)"
+                v-model="row[c.key]"
+                :aria-label="c.label"
+                @change="(v) => onSwitch(c, row, v === true)"
+              />
+              <span v-else :class="{ 'app-negative': isNumeric(c) && isNegative(row[c.key]) }" :title="problemText.get(`${row.id}:${c.key}`)">{{ display(c, row) }}</span>
+            </slot>
+          </template>
+          <template #edit="{ row }">
+            <EditCell :key="`${row.id}:${c.key}`" :column="c as unknown as EditColumn" :row="row" />
+          </template>
+        </VxeColumn>
+        <VxeColumn v-if="slots.actions" min-width="10" />
+        <VxeColumn v-if="slots.actions" title="操作" :width="actionsWidth" fixed="right" :show-overflow="false">
+          <template #header>
+            操作
+            <button type="button" class="app-table-gear" aria-label="表格设置" title="表格设置" @click="settings = true"><el-icon><Setting /></el-icon></button>
+          </template>
+          <template #default="{ row }"><span class="app-edit-actions"><slot name="actions" :row="row" /></span></template>
+        </VxeColumn>
+        <template #empty><slot name="empty" /></template>
+      </VxeTable>
+    </div>
+    <ColumnSettings v-if="slots.actions" v-model="settings" :columns="columns" :shown="shownKeys" :defaults="defaults" @save="save" />
   </div>
 </template>
 
 <style>
-.app-edit-table .app-num {
-  font-variant-numeric: tabular-nums;
+.app-edit-table {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
-.app-edit-table .is-negative {
-  color: var(--el-color-danger);
+.app-edit-body {
+  flex: 1;
+  min-height: 0;
+}
+.app-edit-problems {
+  flex: none;
+  max-height: 62px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--app-space-4);
+  padding: 5px 12px;
+  overflow: auto;
+  background: var(--app-status-fail-bg);
+  color: var(--app-status-fail-fg);
+}
+.app-edit-problems button {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 12px;
+  line-height: 18px;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.app-grid .app-cell-error {
+  box-shadow: 0 0 0 1px var(--el-color-danger) inset;
+}
+.app-edit-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--app-space-3);
+}
+.app-edit-actions .el-button + .el-button {
+  margin-left: 0;
+}
+.app-grid .vxe-body--column .el-switch {
+  vertical-align: top;
 }
 </style>

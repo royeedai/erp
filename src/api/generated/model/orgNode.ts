@@ -8,12 +8,11 @@
  *
  * OpenAPI spec version: 0.1.0
  */
-import type { OrgNodeLevel } from './orgNodeLevel';
 
 export interface OrgNode {
   id: string;
   code: string;
   name: string;
-  level: OrgNodeLevel;
+  enabled: boolean;
   children: OrgNode[];
 }

@@ -10,7 +10,7 @@ const table = inject(editTableKey)
 if (!table) throw new Error('EditCell 只能在 EditTable 内使用')
 
 const root = useTemplateRef<HTMLElement>('root')
-const initial = props.row[props.column.key] ?? null
+const initial = (props.row[props.column.key] ?? null) as string | null
 const draft = ref<string | null>(initial)
 // 行和列在激活期间固定下来：表格滚动复用节点时 props 可能先于卸载变化
 const row = props.row
@@ -75,7 +75,7 @@ onBeforeUnmount(() => {
       :automatic-dropdown="false"
       :clearable="false"
     />
-    <el-input v-else v-model="draft" autocomplete="off" :validate-event="false" />
+    <el-input v-else v-model="draft" autocomplete="off" :validate-event="false" :maxlength="column.maxLength" :aria-label="column.label" />
   </div>
 </template>
 

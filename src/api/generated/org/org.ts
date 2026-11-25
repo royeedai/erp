@@ -21,11 +21,16 @@ import type {
 } from '@tanstack/vue-query';
 
 import {
+  toValue,
   unref
+} from 'vue';
+import type {
+  MaybeRefOrGetter
 } from 'vue';
 
 import type {
   ErrorResponse,
+  GetOrgTreeParams,
   OrgNode
 } from '../model';
 
@@ -37,17 +42,24 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 
-export const getGetOrgTreeUrl = () => {
+export const getGetOrgTreeUrl = (params: GetOrgTreeParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/orgs/tree`
+  return stringifiedParams.length > 0 ? `/orgs/tree?${stringifiedParams}` : `/orgs/tree`
 }
 
-export const getOrgTree = async ( options?: Parameters<typeof request>[1]): Promise<OrgNode[]> => {
+export const getOrgTree = async (params: GetOrgTreeParams, options?: Parameters<typeof request>[1]): Promise<OrgNode[]> => {
 
-  return request<OrgNode[]>(getGetOrgTreeUrl(),
+  return request<OrgNode[]>(getGetOrgTreeUrl(params),
   {
     ...options,
     method: 'GET'
@@ -60,23 +72,23 @@ export const getOrgTree = async ( options?: Parameters<typeof request>[1]): Prom
 
 
 
-export const getGetOrgTreeQueryKey = () => {
+export const getGetOrgTreeQueryKey = (params?: MaybeRefOrGetter<GetOrgTreeParams>,) => {
     return [
-    'orgs','tree'
+    'orgs','tree', ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetOrgTreeQueryOptions = <TData = Awaited<ReturnType<typeof getOrgTree>>, TError = ErrorType<ErrorResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrgTree>>, TError, TData>>, request?: SecondParameter<typeof request>}
+export const getGetOrgTreeQueryOptions = <TData = Awaited<ReturnType<typeof getOrgTree>>, TError = ErrorType<ErrorResponse>>(params: MaybeRefOrGetter<GetOrgTreeParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrgTree>>, TError, TData>>, request?: SecondParameter<typeof request>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  getGetOrgTreeQueryKey();
+  const queryKey =  getGetOrgTreeQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOrgTree>>> = ({ signal }) => getOrgTree({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOrgTree>>> = ({ signal }) => getOrgTree(toValue(params), { signal, ...requestOptions });
 
 
 
@@ -90,11 +102,11 @@ export type GetOrgTreeQueryError = ErrorType<ErrorResponse>
 
 
 export function useGetOrgTree<TData = Awaited<ReturnType<typeof getOrgTree>>, TError = ErrorType<ErrorResponse>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrgTree>>, TError, TData>>, request?: SecondParameter<typeof request>}
+ params: MaybeRefOrGetter<GetOrgTreeParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrgTree>>, TError, TData>>, request?: SecondParameter<typeof request>}
  , queryClient?: QueryClient
  ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetOrgTreeQueryOptions(options)
+  const queryOptions = getGetOrgTreeQueryOptions(params,options)
 
   const query = useQuery(queryOptions as UseQueryOptions<Awaited<ReturnType<typeof getOrgTree>>, TError, TData>, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

@@ -1,16 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-
-const rows = ref([
-  { id: '1', code: 'GW001', name: '项目经理' },
-  { id: '2', code: 'GW002', name: '造价工程师' },
-])
+import { RouterView } from 'vue-router'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import { dialogTransition } from '@/theme/motion'
 </script>
 
 <template>
-  <el-button type="primary">Element Plus</el-button>
-  <vxe-table :data="rows">
-    <vxe-column field="code" title="编码" />
-    <vxe-column field="name" title="名称" />
-  </vxe-table>
+  <el-config-provider
+    :locale="zhCn"
+    :dialog="{ transition: dialogTransition }"
+    :message="{ max: 3, grouping: true }"
+  >
+    <RouterView />
+  </el-config-provider>
 </template>

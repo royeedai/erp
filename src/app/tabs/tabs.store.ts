@@ -33,6 +33,13 @@ export const useTabsStore = defineStore('tabs', () => {
     return !!find(key) || !isFull.value
   }
 
+  /** 固定页签（如工作台）始终排在最前，且不受“从哪个地址进来”影响 */
+  function pin(path: string, title: string) {
+    if (find(path)) return
+    const at = tabs.value.filter((t) => !t.closable).length
+    tabs.value.splice(at, 0, { key: path, title, fullPath: path, closable: false, dirty: false })
+  }
+
   /** 登记并激活；已存在则只更新地址。返回 false 表示已达上限 */
   function open(route: RouteLocationNormalizedLoaded): boolean {
     const key = tabKeyOf(route)
@@ -80,5 +87,5 @@ export const useTabsStore = defineStore('tabs', () => {
     activeKey.value = ''
   }
 
-  return { tabs, activeKey, keys, isFull, find, canOpen, open, neighborOf, remove, setDirty, setTitle, reset }
+  return { tabs, activeKey, keys, isFull, find, canOpen, pin, open, neighborOf, remove, setDirty, setTitle, reset }
 })

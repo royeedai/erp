@@ -1,15 +1,17 @@
 import { fileURLToPath, URL } from 'node:url'
 import vue from '@vitejs/plugin-vue'
+import { msw } from 'msw/vite'
 import { defineConfig } from 'vitest/config'
 
 // mode=trials 只构建三项试验页，产物独立，不进正式包
 export default defineConfig(({ mode }) => ({
-  plugins: [vue()],
+  // msw 的工作线程脚本只随引用了 virtual:msw 的包产出；正式构建不引用，所以不会带上
+  plugins: [vue(), msw()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   build: {
-    outDir: mode === 'trials' ? 'dist-trials' : 'dist',
+    outDir: mode === 'trials' ? 'dist-trials' : mode === 'mock' ? 'dist-mock' : 'dist',
     chunkSizeWarningLimit: 1500,
     rolldownOptions: {
       input: mode === 'trials' ? 'trials.html' : 'index.html',

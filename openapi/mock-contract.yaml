@@ -1,0 +1,281 @@
+openapi: 3.0.3
+info:
+  title: ERP 模拟契约（阶段 1）
+  version: 0.1.0
+  description: |
+    【模拟】后端还没有提供 OpenAPI，这份契约是前端为了跑通基座手写的。
+    后端给出正式 OpenAPI 后，替换本文件并重新执行 pnpm gen:api。
+    其中 allowedActions、version、字段级错误、409 返回最新值，都是方案第 5 节要求但后端尚未确认的能力。
+servers:
+  - url: /api
+tags:
+  - name: auth
+  - name: org
+  - name: projectRole
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginBody' }
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResult' }
+        default: { $ref: '#/components/responses/Error' }
+  /auth/me:
+    get:
+      tags: [auth]
+      operationId: getMe
+      responses:
+        '200':
+          description: 当前用户
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+        default: { $ref: '#/components/responses/Error' }
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      responses:
+        '204':
+          description: 已退出
+        default: { $ref: '#/components/responses/Error' }
+  /orgs/tree:
+    get:
+      tags: [org]
+      operationId: getOrgTree
+      responses:
+        '200':
+          description: 组织树
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/OrgNode' }
+        default: { $ref: '#/components/responses/Error' }
+  /project-roles:
+    get:
+      tags: [projectRole]
+      operationId: listProjectRoles
+      parameters:
+        - { name: orgId, in: query, required: true, schema: { type: string } }
+        - { name: keyword, in: query, schema: { type: string } }
+        - name: enabled
+          in: query
+          schema: { type: boolean }
+        - { name: page, in: query, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: size, in: query, required: true, schema: { type: integer, minimum: 1, maximum: 200 } }
+      responses:
+        '200':
+          description: 分页列表
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectRolePage' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      tags: [projectRole]
+      operationId: createProjectRole
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProjectRoleCreate' }
+      responses:
+        '201':
+          description: 已新增
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectRole' }
+        default: { $ref: '#/components/responses/Error' }
+  /project-roles/{id}:
+    put:
+      tags: [projectRole]
+      operationId: updateProjectRole
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProjectRoleUpdate' }
+      responses:
+        '200':
+          description: 已保存
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectRole' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [projectRole]
+      operationId: deleteProjectRole
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { name: version, in: query, required: true, schema: { type: integer } }
+      responses:
+        '204':
+          description: 已删除
+        default: { $ref: '#/components/responses/Error' }
+  /project-roles/{id}/status:
+    put:
+      tags: [projectRole]
+      operationId: setProjectRoleStatus
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StatusBody' }
+      responses:
+        '200':
+          description: 已更新
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectRole' }
+        default: { $ref: '#/components/responses/Error' }
+components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string }
+  responses:
+    Error:
+      description: 错误
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiErrorBody' }
+  schemas:
+    LoginBody:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string }
+    LoginResult:
+      type: object
+      required: [token, me]
+      properties:
+        token: { type: string }
+        me: { $ref: '#/components/schemas/Me' }
+    Me:
+      type: object
+      required: [id, name, permissions]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        permissions:
+          type: array
+          items: { type: string }
+    OrgNode:
+      type: object
+      required: [id, code, name, level, children]
+      properties:
+        id: { type: string }
+        code: { type: string }
+        name: { type: string }
+        level: { type: string, enum: [group, org] }
+        children:
+          type: array
+          items: { $ref: '#/components/schemas/OrgNode' }
+    AllowedAction:
+      type: object
+      required: [action, allowed]
+      properties:
+        action: { type: string, enum: [edit, delete, enable, disable] }
+        allowed: { type: boolean }
+        reason:
+          type: string
+          description: 不允许时的原因，直接展示给用户
+    ProjectRole:
+      type: object
+      required: [id, orgId, orgName, code, name, isManager, enabled, refCount, version, updatedAt, updatedBy, allowedActions]
+      properties:
+        id: { type: string }
+        orgId: { type: string }
+        orgName: { type: string }
+        code: { type: string }
+        name: { type: string }
+        isManager: { type: boolean, description: 经理岗位，每个组织只能有一个 }
+        enabled: { type: boolean }
+        remark: { type: string, nullable: true }
+        refCount: { type: integer, description: 被项目引用的次数 }
+        version: { type: integer }
+        updatedAt: { type: string, description: 'YYYY-MM-DD HH:mm:ss' }
+        updatedBy: { type: string }
+        allowedActions:
+          type: array
+          items: { $ref: '#/components/schemas/AllowedAction' }
+    ProjectRolePage:
+      type: object
+      required: [list, total]
+      properties:
+        list:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectRole' }
+        total: { type: integer }
+    ProjectRoleCreate:
+      type: object
+      required: [orgId, code, name, isManager]
+      properties:
+        orgId: { type: string }
+        code: { type: string }
+        name: { type: string }
+        isManager: { type: boolean }
+        remark: { type: string, nullable: true }
+    ProjectRoleUpdate:
+      type: object
+      required: [code, name, isManager, version]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        isManager: { type: boolean }
+        remark: { type: string, nullable: true }
+        version: { type: integer }
+    StatusBody:
+      type: object
+      required: [enabled, version]
+      properties:
+        enabled: { type: boolean }
+        version: { type: integer }
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field: { type: string }
+        message: { type: string }
+    ApiErrorBody:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        traceId: { type: string }
+        permission: { type: string, description: 403 时缺少的权限码 }
+        fieldErrors:
+          type: array
+          items: { $ref: '#/components/schemas/FieldError' }
+        latest:
+          type: object
+          description: 409 时服务端的最新值
+          additionalProperties: true
+        references:
+          type: array
+          description: 删除被拦时的引用明细
+          items: { type: string }

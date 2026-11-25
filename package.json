@@ -13,8 +13,11 @@
     "typecheck": "vue-tsc --build --noEmit",
     "build": "vue-tsc --build --noEmit && vite build",
     "build:only": "vite build",
+    "build:mock": "vite build --mode mock",
     "preview": "vite preview --port 4173 --strictPort",
     "test": "vitest run",
+    "gen:api": "orval --config orval.config.ts",
+    "e2e": "playwright test -c tests/e2e/playwright.config.ts",
     "trial": "playwright test -c tests/trials/playwright.config.ts"
   },
   "dependencies": {

@@ -1,0 +1,46 @@
+{
+  "start": {
+    "heapMB": 3.81,
+    "nodes": 74,
+    "listeners": 44
+  },
+  "sevenBills": {
+    "heapMB": 29.77,
+    "nodes": 17829,
+    "listeners": 9981
+  },
+  "eightBills": {
+    "heapMB": 33.07,
+    "nodes": 20344,
+    "listeners": 11394
+  },
+  "allClosed": {
+    "heapMB": 8.28,
+    "nodes": 79,
+    "listeners": 44
+  },
+  "aliveAfterAllClosed": 0,
+  "cycleBase": {
+    "heapMB": 9.12,
+    "nodes": 79,
+    "listeners": 44
+  },
+  "cycleSeries": [
+    {
+      "heapMB": 9.32,
+      "nodes": 79,
+      "listeners": 44
+    },
+    {
+      "heapMB": 9.42,
+      "nodes": 79,
+      "listeners": 44
+    },
+    {
+      "heapMB": 9.55,
+      "nodes": 79,
+      "listeners": 44
+    }
+  ],
+  "aliveAfterCycles": 0
+}

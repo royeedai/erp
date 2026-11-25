@@ -1,0 +1,29 @@
+{
+  "ninthBlocked": true,
+  "closedBackgroundUnmounted": true,
+  "othersUntouched": true,
+  "closedActiveUnmounted": true,
+  "activeAfterClosing8": "7",
+  "value2Kept": true,
+  "value4Kept": true,
+  "reopenedFresh": true,
+  "routeChanges": {
+    "1": 0,
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 0,
+    "8": 0
+  },
+  "editByMouse": {
+    "editing": 0,
+    "text": "鼠标切换"
+  },
+  "editByRouter": {
+    "editing": 1,
+    "inputValue": "程序切换",
+    "text": ""
+  }
+}

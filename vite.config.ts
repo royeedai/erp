@@ -15,7 +15,9 @@ export default defineConfig(({ mode }) => ({
       input: mode === 'trials' ? 'trials.html' : 'index.html',
     },
   },
-  server: { port: 5173, strictPort: true },
+  // 本机的 localhost 会解析到 [::1] 且连不上，统一绑定 127.0.0.1
+  server: { host: '127.0.0.1', port: 5173, strictPort: true },
+  preview: { host: '127.0.0.1' },
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.ts'],

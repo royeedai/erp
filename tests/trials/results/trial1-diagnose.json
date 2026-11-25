@@ -1,0 +1,57 @@
+{
+  "cpu1x": {
+    "paint": {
+      "n": 100,
+      "p50": 59.7,
+      "p95": 105.5,
+      "max": 124.7
+    },
+    "perSwitchMs": {
+      "script": 2.4,
+      "layout": 9.3,
+      "style": 31.4,
+      "task": 203.4
+    }
+  },
+  "cpu4x": {
+    "paint": {
+      "n": 100,
+      "p50": 406.6,
+      "p95": 593,
+      "max": 740.7
+    },
+    "perSwitchMs": {
+      "script": 9.2,
+      "layout": 38.6,
+      "style": 57,
+      "task": 809.7
+    }
+  },
+  "topSelfMsPerSwitch": [
+    "120.2ms (program) :0",
+    "50.2ms (idle) :0",
+    "17.5ms getBoundingClientRect :0",
+    "10.4ms get runtime-core.esm-bundler-DQ4QVL7_.js:994",
+    "8.2ms renderTdColumn trials-BnccRbVZ.js:75609",
+    "4.4ms patchStyle trials-BnccRbVZ.js:394",
+    "2.4ms insertBefore :0",
+    "2.1ms patchElement runtime-core.esm-bundler-DQ4QVL7_.js:3914",
+    "1.8ms runRenderer trials-BnccRbVZ.js:74810",
+    "1.7ms setProperty :0",
+    "1.6ms normalizeClass runtime-core.esm-bundler-DQ4QVL7_.js:120",
+    "1.1ms _createVNode runtime-core.esm-bundler-DQ4QVL7_.js:4612",
+    "1.1ms patchProps runtime-core.esm-bundler-DQ4QVL7_.js:3968",
+    "1.0ms run runtime-core.esm-bundler-DQ4QVL7_.js:433",
+    "1.0ms query :5867",
+    "1.0ms (anonymous) runtime-core.esm-bundler-DQ4QVL7_.js:11",
+    "0.9ms (anonymous) trials-BnccRbVZ.js:76308",
+    "0.8ms patch runtime-core.esm-bundler-DQ4QVL7_.js:3787",
+    "0.8ms processElement runtime-core.esm-bundler-DQ4QVL7_.js:3856",
+    "0.7ms patchKeyedChildren runtime-core.esm-bundler-DQ4QVL7_.js:4168",
+    "0.6ms (anonymous) trials-BnccRbVZ.js:75984",
+    "0.6ms set runtime-core.esm-bundler-DQ4QVL7_.js:1026",
+    "0.6ms track runtime-core.esm-bundler-DQ4QVL7_.js:669",
+    "0.6ms renderCellHandle trials-BnccRbVZ.js:74088",
+    "0.6ms (garbage collector) :0"
+  ]
+}

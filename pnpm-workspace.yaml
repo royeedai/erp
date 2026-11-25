@@ -1,0 +1,25 @@
+# vxe-table 4.24.4 与 plugin-render-element 4.4.4 的发布包没有声明任何依赖（官方 npm 与镜像一致），
+# 但源码引用了下面这些包。这里补上声明，避免解析依赖于 pnpm 的偶然提升。
+packageExtensions:
+  vxe-table@4.24.4:
+    dependencies:
+      '@vxe-ui/core': 4.5.9
+      dom-zindex: 1.0.8
+      vxe-pc-ui: 4.21.6
+      xe-utils: 4.1.5
+    peerDependencies:
+      vue: ^3.4.0
+  '@vxe-ui/plugin-render-element@4.4.4':
+    dependencies:
+      dayjs: 1.11.23
+      xe-utils: 4.1.5
+    peerDependencies:
+      element-plus: ^2.0.0
+      vue: ^3.4.0
+      vxe-table: ^4.0.0
+# 不允许依赖执行安装脚本，只放行 msw
+onlyBuiltDependencies:
+  - msw
+ignoredBuiltDependencies:
+  - esbuild
+  - vue-demi

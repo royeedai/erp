@@ -36,6 +36,14 @@ const editor: CellEditor = {
   ownsEnter() {
     return props.column.kind === 'select' && editor.isPopupOpen()
   },
+  insert(text) {
+    const input = root.value?.querySelector<HTMLInputElement>('input')
+    if (!input || finished) return
+    const start = input.selectionStart ?? input.value.length
+    input.setRangeText(text, start, input.selectionEnd ?? start, 'end')
+    // 走一遍输入事件，el-input、AmountInput 按自己的规则更新草稿
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  },
 }
 
 onMounted(async () => {

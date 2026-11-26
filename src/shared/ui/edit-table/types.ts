@@ -62,6 +62,8 @@ export interface CellEditor {
   isPopupOpen(): boolean
   /** 展开的下拉正在用回车选项；日期框键入后也会展开面板，但回车仍应确认并前进 */
   ownsEnter(): boolean
+  /** 补进格子还没拿到焦点时按下的字，替换选中的部分 */
+  insert(text: string): void
 }
 
 export interface EditTableContext {

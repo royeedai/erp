@@ -130,6 +130,23 @@ test('增行：加在末尾、焦点进第一格、默认值填好、回车到�
   await expect(page).toHaveURL(/category=GC/)
 })
 
+test('增行后立刻敲字：字不丢，回车照常往下走，页签有未保存圆点', async ({ page }) => {
+  await open(page)
+  // 不等焦点进格子就敲：手快的人和扫码枪都是这样。增行到格子拿到焦点要几十毫秒，这段时间的按键要先存着再补进去
+  await btn(page, '增行').click()
+  await page.keyboard.type('GC21')
+  await page.keyboard.press('Enter')
+  // 用逐键敲的字：Playwright 敲中文走 insertText，不产生按键；真人在按钮上也开不了输入法
+  await page.keyboard.type('Quick entry')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.app-tab-dirty')).toHaveCount(1)
+  const added = page.locator('.vxe-table--main-wrapper .vxe-body--row[rowid^="new-"]')
+  await expect(added.filter({ visible: true })).toContainText('GC21')
+  await expect(added.filter({ visible: true })).toContainText('Quick entry')
+  // 回车不能落到“增行”按钮上再加一行
+  await expect(added).toHaveCount(1)
+})
+
 test('校验：必填、格式、服务端错误都落到格子，摘要能跳，改了就消', async ({ page }) => {
   const requests = saves(page)
   await open(page)
@@ -148,7 +165,7 @@ test('校验：必填、格式、服务端错误都落到格子，摘要能跳�
   await expect(problems(page)).toContainText('只能用字母、数字、下划线和短横线')
   await expect(editor(page)).toHaveValue('岗 位')
   await expect(editor(page)).toBeFocused()
-  await page.keyboard.press('Control+A')
+  await page.keyboard.press('ControlOrMeta+A')
   await page.keyboard.type('GC03')
   await page.keyboard.press('Enter')
   await page.locator('.vxe-body--row[rowid^="new-"]').filter({ visible: true }).locator('.el-switch').first().click()
@@ -163,7 +180,7 @@ test('校验：必填、格式、服务端错误都落到格子，摘要能跳�
   await problems(page).getByRole('button', { name: /岗位编码/ }).click()
   await expect(editor(page)).toHaveValue('GC03')
   await expect(editor(page)).toBeFocused()
-  await page.keyboard.press('Control+A')
+  await page.keyboard.press('ControlOrMeta+A')
   await page.keyboard.type('GC20')
   await page.keyboard.press('Enter')
   await expect(problems(page)).toContainText('有 1 处要改')
@@ -186,7 +203,7 @@ test('整表保存：增、改、删一次提交，连点只发一次，没改�
   await (await actionOf(page, 'GC03', 'edit')).click()
   await expect(editor(page)).toHaveValue('GC03')
   await page.keyboard.press('Enter')
-  await page.keyboard.press('Control+A')
+  await page.keyboard.press('ControlOrMeta+A')
   await page.keyboard.type('成本工程师')
   await btn(page, '增行').click()
   await expect(editor(page)).toHaveValue('')
@@ -249,7 +266,7 @@ test('版本冲突：逐行并列两边的值，直接关掉不算选择，保�
     await (await actionOf(page, code, 'edit')).click()
     await expect(editor(page)).toHaveValue(code)
     await page.keyboard.press('Enter')
-    await page.keyboard.press('Control+A')
+    await page.keyboard.press('ControlOrMeta+A')
     await page.keyboard.type(text)
     await page.keyboard.press('Enter')
   }

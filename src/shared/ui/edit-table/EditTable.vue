@@ -220,15 +220,70 @@ async function activate(row: Row, key: string) {
   else await table.setEditCell(row, key)
 }
 
-/** 从表格外面（按钮、错误摘要）跳到一格 */
+/**
+ * 从表格外面（按钮、错误摘要）跳到一格要几十毫秒：等 vxe 收起旧格子、新行渲染、编辑器挂载后才拿到焦点。
+ * 这段时间焦点还在按钮上，按下的字会丢，回车还会再点一次按钮。所以先把按键存着，格子拿到焦点后按顺序补进去：
+ * 字补进格子，回车、Tab 照常往下走。输入法正在拼字、带 Ctrl/Alt/⌘ 的、落在别的输入框里的按键不管。
+ */
+type HeldKey = { text: string } | { step: 1 | -1 }
+let held: HeldKey[] | null = null
+
+function holdKey(e: KeyboardEvent) {
+  if (!held || e.isComposing || e.ctrlKey || e.altKey || e.metaKey) return
+  const target = e.target
+  if (target instanceof HTMLElement && (target.isContentEditable || /^(?:INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return
+  if (e.key.length === 1) {
+    const last = held.at(-1)
+    if (last && 'text' in last) last.text += e.key
+    else held.push({ text: e.key })
+  } else if (e.key === 'Enter' || e.key === 'Tab') {
+    held.push({ step: e.shiftKey ? -1 : 1 })
+  } else {
+    return
+  }
+  e.preventDefault()
+  e.stopPropagation()
+}
+
+const rootRef = useTemplateRef<HTMLElement>('rootRef')
+/** 等焦点进到表格里的输入框（格子编辑器或开关）；最多等 300ms */
+async function focusSettled() {
+  for (let waited = 0; waited < 300; waited += 10) {
+    const active = document.activeElement
+    if (active instanceof HTMLInputElement && rootRef.value?.contains(active)) return
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+}
+
 async function focusCell(rowId: string, key: string) {
-  // 点表格外的按钮时，vxe 会在这之后才收起正在编辑的格子，马上开新格子会被它清掉焦点：先收完再开
-  await tableRef.value?.clearEdit()
-  await new Promise((resolve) => setTimeout(resolve, 30))
-  const row = props.rows.find((r) => r.id === rowId)
-  if (!row) return
-  await tableRef.value?.setCurrentRow(row)
-  await activate(row, key)
+  const own = held === null
+  if (own) {
+    held = []
+    document.addEventListener('keydown', holdKey, true)
+  }
+  try {
+    // 点表格外的按钮时，vxe 会在这之后才收起正在编辑的格子，马上开新格子会被它清掉焦点：先收完再开
+    await tableRef.value?.clearEdit()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    const row = props.rows.find((r) => r.id === rowId)
+    if (!row) return
+    await tableRef.value?.setCurrentRow(row)
+    await activate(row, key)
+    if (!own) return
+    // 按存下的顺序补；补的过程中新按的键也继续存着，直到全部补完才放手
+    for (;;) {
+      await focusSettled()
+      const next = held?.shift()
+      if (!next) break
+      if ('text' in next) editor?.insert(next.text)
+      else await move(next.step, switchCell(document.activeElement) ?? undefined)
+    }
+  } finally {
+    if (own) {
+      document.removeEventListener('keydown', holdKey, true)
+      held = null
+    }
+  }
 }
 
 /** 当前格之后（或之前）的下一个可编辑格，跨行 */
@@ -324,7 +379,7 @@ defineExpose({ validate, focusCell, totals, clearSelection, commit: () => editor
 </script>
 
 <template>
-  <div class="app-edit-table app-grid" :class="{ 'is-editing': !readonly }" :style="{ '--app-row-height': `${density}px` }" @keydown.capture="onKeydown">
+  <div ref="rootRef" class="app-edit-table app-grid" :class="{ 'is-editing': !readonly }" :style="{ '--app-row-height': `${density}px` }" @keydown.capture="onKeydown">
     <div v-if="problems.length > 0" class="app-edit-problems" role="alert">
       <b>有 {{ problems.length }} 处要改</b>
       <button v-for="e in problems" :key="`${e.rowId}:${e.key}`" type="button" @click="focusCell(e.rowId, e.key)">
